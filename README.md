@@ -32,6 +32,16 @@ npm test
 npm run build      # gera dist/ para publicar no artifact
 ```
 
+## Funcionalidades
+
+- **Chat 1:1** com AWS, OCI e DevOps, com histórico compactado automaticamente.
+- **Grupo Cloud**: moderador escolhe quem fala, `@menção` chama direto, `PASSO`
+  descarta quem não tem nada novo, síntese une as falas.
+- **Memória**: núcleo do ambiente (sempre no prompt, até ~100 tokens), notas
+  extraídas das conversas (entram só quando relevantes, busca local) e respostas
+  fixadas 📌 reaproveitáveis com 0 tokens.
+- **Uso de tokens**: consumo estimado por agente, motivo e conversa (hoje / 7 dias).
+
 ## Tokens
 
 Toda chamada ao Claude passa por `src/core/metered.ts`:
