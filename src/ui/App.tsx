@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChatView } from "./ChatView";
 import { GroupView } from "./GroupView";
 import { MemoryPanel } from "./MemoryPanel";
+import { TokensPanel } from "./TokensPanel";
 import { Avatar } from "./Avatar";
 import { createServices, type Services } from "./services";
 
@@ -58,10 +59,15 @@ export function App() {
           <button className={selecionado === "memoria" ? "ativo" : ""} onClick={() => setSelecionado("memoria")}>
             🧠 Memória
           </button>
+          <button className={selecionado === "tokens" ? "ativo" : ""} onClick={() => setSelecionado("tokens")}>
+            📊 Uso de tokens
+          </button>
         </nav>
       </aside>
       {selecionado === "memoria" ? (
         <MemoryPanel services={services} />
+      ) : selecionado === "tokens" ? (
+        <TokensPanel services={services} />
       ) : selecionado.startsWith("grupo:") && services.groups.has(selecionado.slice(6)) ? (
         <GroupView key={selecionado} services={services} group={services.groups.get(selecionado.slice(6))!} />
       ) : (
