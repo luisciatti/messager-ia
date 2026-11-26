@@ -54,6 +54,11 @@ export class UsageLog {
     return full;
   }
 
+  /** Carrega entradas salvas (sem avisar inscritos). */
+  hydrate(entries: Omit<UsageEntry, "id">[]): void {
+    for (const e of [...entries].sort((a, b) => a.at - b.at)) this.items.push({ ...e, id: this.nextId++ });
+  }
+
   entries(): readonly UsageEntry[] {
     return this.items;
   }
