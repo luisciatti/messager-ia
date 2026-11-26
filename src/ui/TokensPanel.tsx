@@ -73,7 +73,7 @@ export function TokensPanel({ services }: { services: Services }) {
         </div>
       </div>
       <p className="ajuda">
-        Estimativa (~{CHARS_PER_TOKEN} caracteres por token): o artifact não informa a contagem exata. Serve para comparar
+        Estimativa (~{CHARS_PER_TOKEN.toLocaleString("pt-BR")} caracteres por token): o artifact não informa a contagem exata. Serve para comparar
         quem gasta mais.
       </p>
 
