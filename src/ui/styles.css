@@ -44,3 +44,25 @@ body { margin: 0; }
   .contatos li small { display: none; }
   .mensagens { padding: 12px; }
 }
+.atalhos { margin-top: auto; border-top: 1px solid var(--borda); }
+.atalhos button { all: unset; box-sizing: border-box; width: 100%; padding: 14px 16px; cursor: pointer; }
+.atalhos button:hover, .atalhos button.ativo { background: #f0f2f5; }
+.fixar { all: unset; cursor: pointer; margin-left: 6px; opacity: 0.4; }
+.fixar:hover { opacity: 1; }
+.sugestao { margin: 0 16px 8px; padding: 10px 12px; background: #fff7d6; border-radius: 8px; font-size: 14px; }
+.sugestao p { margin: 0 0 8px; }
+.aviso { margin: 0; padding: 6px 16px; color: var(--sutil); font-size: 13px; }
+.linha { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.painel button, .sugestao button { border: none; border-radius: 8px; padding: 8px 14px; background: var(--verde); color: #fff; font-weight: 600; cursor: pointer; }
+.painel button:disabled { opacity: 0.5; }
+.secundario { background: #e9edef !important; color: var(--texto) !important; }
+.painel { background: var(--painel); overflow-y: auto; padding: 24px 32px; min-height: 0; }
+.painel h2 { margin-top: 0; }
+.painel h3 { margin: 24px 0 4px; font-size: 15px; }
+.painel textarea { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--borda); border-radius: 8px; margin-bottom: 6px; }
+.ajuda { color: var(--sutil); font-size: 13px; margin: 0 0 8px; }
+.alerta { color: #9b1c1c; font-size: 13px; font-weight: 600; }
+.itens { list-style: none; padding: 0; margin: 0; }
+.itens li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.itens li small { color: var(--sutil); font-size: 12px; grid-column: 1; }
+.itens .remover { grid-row: 1 / 3; grid-column: 2; background: none !important; color: var(--sutil) !important; font-size: 18px; padding: 0 8px !important; }
