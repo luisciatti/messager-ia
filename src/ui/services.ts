@@ -1,5 +1,6 @@
 import { createClaudeClient, type ClaudeClient } from "../adapters/claude";
 import { createStorage, type Storage } from "../adapters/storage";
+import { MemoryStore } from "../core/memory";
 import { createMeteredClient, type MeteredClient } from "../core/metered";
 import { agents } from "../core/registry";
 import { UsageLog } from "../core/tokens";
@@ -15,5 +16,5 @@ export interface Services extends ChatDeps {
 export async function createServices(): Promise<Services> {
   const [client, storage] = await Promise.all([createClaudeClient(), createStorage()]);
   const log = new UsageLog();
-  return { client, storage, log, agents, metered: createMeteredClient(client, log) };
+  return { client, storage, log, agents, memory: new MemoryStore(storage), metered: createMeteredClient(client, log) };
 }

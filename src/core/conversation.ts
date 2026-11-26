@@ -22,6 +22,8 @@ export interface StoredMessage {
   agentId?: string;
   /** Tokens estimados da resposta (só assistant). */
   tokens?: number;
+  /** Resposta reaproveitada de uma fixada (0 tokens). */
+  reaproveitada?: boolean;
 }
 
 export interface Conversation {
@@ -72,10 +74,37 @@ export function compactionRequest(conv: Conversation): AskRequest {
     .join("\n");
   const anterior = conv.resumo ? `Resumo anterior:\n${conv.resumo}\n\n` : "";
   return {
-    system: `Resuma a conversa em até ${SUMMARY_MAX_WORDS} palavras. Guarde fatos, decisões, números e pendências. Sem introdução.`,
+    // Mesma chamada resume E extrai notas para a memória: sem chamada extra.
+    system: [
+      `Resuma a conversa em até ${SUMMARY_MAX_WORDS} palavras: fatos, decisões, números e pendências.`,
+      "Extraia até 3 notas duráveis (fato do ambiente ou decisão), até 20 palavras cada; [] se nada.",
+      'Responda só JSON: {"resumo":"...","notas":["..."]}',
+    ].join("\n"),
     messages: [{ role: "user", content: `${anterior}Novas mensagens:\n${trecho}` }],
     modelTier: "quick",
   };
+}
+
+export interface CompactionResult {
+  resumo: string;
+  notas: string[];
+}
+
+/** Aceita JSON (com ou sem texto em volta); se falhar, usa o texto como resumo. */
+export function parseCompaction(text: string): CompactionResult {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const j = JSON.parse(m[0]) as { resumo?: unknown; notas?: unknown };
+      if (typeof j.resumo === "string") {
+        const notas = Array.isArray(j.notas) ? j.notas.filter((n): n is string => typeof n === "string").slice(0, 3) : [];
+        return { resumo: j.resumo, notas };
+      }
+    } catch {
+      /* cai no fallback */
+    }
+  }
+  return { resumo: text, notas: [] };
 }
 
 export function applyCompaction(conv: Conversation, resumo: string): Conversation {

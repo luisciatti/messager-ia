@@ -9,6 +9,7 @@ import {
   KEEP_LAST,
   MAX_STORED,
   needsCompaction,
+  parseCompaction,
   type StoredMessage,
 } from "../src/core/conversation";
 
@@ -67,5 +68,15 @@ describe("appendMessages", () => {
     const after = appendMessages(conv, msg(1000), msg(1001));
     expect(after.mensagens).toHaveLength(MAX_STORED);
     expect(after.compactadoAte).toBe(8);
+  });
+});
+
+describe("parseCompaction", () => {
+  it("lê JSON mesmo com texto em volta", () => {
+    expect(parseCompaction('ok {"resumo":"r","notas":["a","b","c","d"]} fim')).toEqual({ resumo: "r", notas: ["a", "b", "c"] });
+  });
+
+  it("usa o texto como resumo se não vier JSON", () => {
+    expect(parseCompaction("só texto")).toEqual({ resumo: "só texto", notas: [] });
   });
 });
