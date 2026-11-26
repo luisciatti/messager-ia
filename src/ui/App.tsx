@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChatView } from "./ChatView";
+import { GroupView } from "./GroupView";
 import { MemoryPanel } from "./MemoryPanel";
 import { Avatar } from "./Avatar";
 import { createServices, type Services } from "./services";
@@ -30,6 +31,17 @@ export function App() {
           </small>
         </header>
         <ul>
+          {[...services.groups.values()].map((g) => (
+            <li key={g.id}>
+              <button className={selecionado === `grupo:${g.id}` ? "ativo" : ""} onClick={() => setSelecionado(`grupo:${g.id}`)}>
+                <Avatar id="grupo" label={g.nome} />
+                <span>
+                  <strong>{g.nome}</strong>
+                  <small>Grupo · {g.membros.length} agentes</small>
+                </span>
+              </button>
+            </li>
+          ))}
           {contatos.map((a) => (
             <li key={a.id}>
               <button className={a.id === selecionado ? "ativo" : ""} onClick={() => setSelecionado(a.id)}>
@@ -50,6 +62,8 @@ export function App() {
       </aside>
       {selecionado === "memoria" ? (
         <MemoryPanel services={services} />
+      ) : selecionado.startsWith("grupo:") && services.groups.has(selecionado.slice(6)) ? (
+        <GroupView key={selecionado} services={services} group={services.groups.get(selecionado.slice(6))!} />
       ) : (
         <ChatView key={agente.id} services={services} agent={agente} />
       )}

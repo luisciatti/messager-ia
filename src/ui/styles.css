@@ -66,3 +66,6 @@ body { margin: 0; }
 .itens li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--borda); }
 .itens li small { color: var(--sutil); font-size: 12px; grid-column: 1; }
 .itens .remover { grid-row: 1 / 3; grid-column: 2; background: none !important; color: var(--sutil) !important; font-size: 18px; padding: 0 8px !important; }
+.autor { display: block; font-size: 12px; font-weight: 600; color: var(--verde); margin-bottom: 2px; }
+.bolha.interna { background: #f7f8fa; font-size: 13px; max-width: 65%; border-left: 3px solid #d1d7db; }
+.bolha.interna .autor { color: var(--sutil); }
