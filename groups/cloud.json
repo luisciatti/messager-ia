@@ -1,0 +1,6 @@
+{
+  "id": "cloud",
+  "nome": "Cloud",
+  "membros": ["aws", "oci", "devops"],
+  "maxFalantes": 3
+}
