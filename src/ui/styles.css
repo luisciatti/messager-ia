@@ -1,0 +1,68 @@
+:root {
+  --verde: #00a884;
+  --fundo: #efeae2;
+  --painel: #ffffff;
+  --borda: #e9edef;
+  --texto: #111b21;
+  --sutil: #667781;
+  --bolha-user: #d9fdd3;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--texto);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.carregando { padding: 24px; }
+.app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+.contatos { background: var(--painel); border-right: 1px solid var(--borda); display: flex; flex-direction: column; min-height: 0; }
+.contatos header { padding: 16px; background: #f0f2f5; display: flex; flex-direction: column; gap: 2px; }
+.contatos header small, .chat-header small, .contatos li small { color: var(--sutil); font-size: 12px; }
+.contatos ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.contatos li button { all: unset; box-sizing: border-box; width: 100%; display: flex; gap: 12px; align-items: center; padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--borda); }
+.contatos li button:hover, .contatos li button.ativo { background: #f0f2f5; }
+.contatos li span { display: flex; flex-direction: column; min-width: 0; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }
+.chat { display: flex; flex-direction: column; background: var(--fundo); min-height: 0; }
+.chat-header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #f0f2f5; border-bottom: 1px solid var(--borda); }
+.chat-header div { display: flex; flex-direction: column; }
+.mensagens { flex: 1; overflow-y: auto; padding: 16px 8%; display: flex; flex-direction: column; gap: 6px; }
+.vazio, .resumo { align-self: center; color: var(--sutil); font-size: 13px; background: #fff8; padding: 4px 10px; border-radius: 8px; }
+.bolha { max-width: 75%; padding: 6px 10px 4px; border-radius: 8px; background: var(--painel); box-shadow: 0 1px 0.5px #0b141a22; }
+.bolha p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+.bolha small { display: block; text-align: right; color: var(--sutil); font-size: 11px; }
+.bolha.user { align-self: flex-end; background: var(--bolha-user); }
+.bolha.assistant { align-self: flex-start; }
+.bolha.pendente { opacity: 0.7; }
+.erro { margin: 0; padding: 8px 16px; background: #fde8e8; color: #9b1c1c; font-size: 14px; }
+.entrada { display: flex; gap: 8px; padding: 10px 16px; background: #f0f2f5; }
+.entrada textarea { flex: 1; resize: none; border: none; border-radius: 8px; padding: 10px 12px; font: inherit; }
+.entrada button { border: none; border-radius: 8px; padding: 0 18px; background: var(--verde); color: #fff; font-weight: 600; cursor: pointer; }
+.entrada button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 700px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .contatos ul { display: flex; overflow-x: auto; }
+  .contatos li button { border-bottom: none; }
+  .contatos li small { display: none; }
+  .mensagens { padding: 12px; }
+}
+.atalhos { margin-top: auto; border-top: 1px solid var(--borda); }
+.atalhos button { all: unset; box-sizing: border-box; width: 100%; padding: 14px 16px; cursor: pointer; }
+.atalhos button:hover, .atalhos button.ativo { background: #f0f2f5; }
+.fixar { all: unset; cursor: pointer; margin-left: 6px; opacity: 0.4; }
+.fixar:hover { opacity: 1; }
+.sugestao { margin: 0 16px 8px; padding: 10px 12px; background: #fff7d6; border-radius: 8px; font-size: 14px; }
+.sugestao p { margin: 0 0 8px; }
+.aviso { margin: 0; padding: 6px 16px; color: var(--sutil); font-size: 13px; }
+.linha { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.painel button, .sugestao button { border: none; border-radius: 8px; padding: 8px 14px; background: var(--verde); color: #fff; font-weight: 600; cursor: pointer; }
+.painel button:disabled { opacity: 0.5; }
+.secundario { background: #e9edef !important; color: var(--texto) !important; }
+.painel { background: var(--painel); overflow-y: auto; padding: 24px 32px; min-height: 0; }
+.painel h2 { margin-top: 0; }
+.painel h3 { margin: 24px 0 4px; font-size: 15px; }
+.painel textarea { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--borda); border-radius: 8px; margin-bottom: 6px; }
+.ajuda { color: var(--sutil); font-size: 13px; margin: 0 0 8px; }
+.alerta { color: #9b1c1c; font-size: 13px; font-weight: 600; }
+.itens { list-style: none; padding: 0; margin: 0; }
+.itens li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.itens li small { color: var(--sutil); font-size: 12px; grid-column: 1; }
+.itens .remover { grid-row: 1 / 3; grid-column: 2; background: none !important; color: var(--sutil) !important; font-size: 18px; padding: 0 8px !important; }

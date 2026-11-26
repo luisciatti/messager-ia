@@ -1,20 +1,58 @@
-import { useEffect, useState } from "react";
-import { createClaudeClient, type ClaudeClient } from "../adapters/claude";
+import { useEffect, useMemo, useState } from "react";
+import { ChatView } from "./ChatView";
+import { MemoryPanel } from "./MemoryPanel";
+import { Avatar } from "./Avatar";
+import { createServices, type Services } from "./services";
 
 export function App() {
-  const [client, setClient] = useState<ClaudeClient | null>(null);
+  const [services, setServices] = useState<Services | null>(null);
+  const [selecionado, setSelecionado] = useState("aws");
 
   useEffect(() => {
-    createClaudeClient().then(setClient);
+    createServices().then(setServices);
   }, []);
 
+  const contatos = useMemo(
+    () => (services ? [...services.agents.values()].filter((a) => a.papel === "especialista") : []),
+    [services],
+  );
+
+  if (!services) return <p className="carregando">Carregando…</p>;
+  const agente = services.agents.get(selecionado) ?? contatos[0];
+
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: 24 }}>
-      <h1>Messager de IA</h1>
-      <p>
-        Modo do Claude:{" "}
-        <strong>{client ? client.mode : "carregando..."}</strong>
-      </p>
-    </main>
+    <div className="app">
+      <aside className="contatos">
+        <header>
+          <strong>Messager de IA</strong>
+          <small>
+            Claude: {services.client.mode} · dados: {services.storage.mode}
+          </small>
+        </header>
+        <ul>
+          {contatos.map((a) => (
+            <li key={a.id}>
+              <button className={a.id === selecionado ? "ativo" : ""} onClick={() => setSelecionado(a.id)}>
+                <Avatar id={a.id} label={a.nome} />
+                <span>
+                  <strong>{a.nome}</strong>
+                  <small>{a.skills.slice(0, 3).join(", ")}</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <nav className="atalhos">
+          <button className={selecionado === "memoria" ? "ativo" : ""} onClick={() => setSelecionado("memoria")}>
+            🧠 Memória
+          </button>
+        </nav>
+      </aside>
+      {selecionado === "memoria" ? (
+        <MemoryPanel services={services} />
+      ) : (
+        <ChatView key={agente.id} services={services} agent={agente} />
+      )}
+    </div>
   );
 }
