@@ -24,6 +24,8 @@ export interface StoredMessage {
   tokens?: number;
   /** Resposta reaproveitada de uma fixada (0 tokens). */
   reaproveitada?: boolean;
+  /** Fala individual de agente no grupo: exibida, mas fora do contexto (a síntese já a cobre). */
+  interna?: boolean;
 }
 
 export interface Conversation {
@@ -54,6 +56,7 @@ function normalize(list: ChatMessage[]): ChatMessage[] {
 export function buildContext(conv: Conversation, userText: string): ChatMessage[] {
   const recent = conv.mensagens
     .slice(conv.compactadoAte)
+    .filter((m) => !m.interna)
     .map(({ role, content }) => ({ role, content }));
   const msgs = normalize([...recent, { role: "user", content: userText }]);
   if (conv.resumo) {
@@ -62,14 +65,28 @@ export function buildContext(conv: Conversation, userText: string): ChatMessage[
   return msgs;
 }
 
+/** Mensagens que contam para o contexto (não compactadas e não internas). */
+function contextIndexes(conv: Conversation): number[] {
+  const idx: number[] = [];
+  for (let i = conv.compactadoAte; i < conv.mensagens.length; i++) if (!conv.mensagens[i].interna) idx.push(i);
+  return idx;
+}
+
 export function needsCompaction(conv: Conversation): boolean {
-  return conv.mensagens.length - conv.compactadoAte >= COMPACT_AT;
+  return contextIndexes(conv).length >= COMPACT_AT;
+}
+
+/** Índice bruto onde começam as KEEP_LAST últimas mensagens de contexto. */
+function compactionCut(conv: Conversation): number {
+  const idx = contextIndexes(conv);
+  return idx[idx.length - KEEP_LAST] ?? conv.mensagens.length;
 }
 
 export function compactionRequest(conv: Conversation): AskRequest {
-  const end = conv.mensagens.length - KEEP_LAST;
+  const end = compactionCut(conv);
   const trecho = conv.mensagens
     .slice(conv.compactadoAte, end)
+    .filter((m) => !m.interna)
     .map((m) => `${m.role === "user" ? "U" : "A"}: ${m.content}`)
     .join("\n");
   const anterior = conv.resumo ? `Resumo anterior:\n${conv.resumo}\n\n` : "";
@@ -108,7 +125,7 @@ export function parseCompaction(text: string): CompactionResult {
 }
 
 export function applyCompaction(conv: Conversation, resumo: string): Conversation {
-  return { ...conv, resumo: resumo.trim(), compactadoAte: conv.mensagens.length - KEEP_LAST };
+  return { ...conv, resumo: resumo.trim(), compactadoAte: compactionCut(conv) };
 }
 
 /** Acrescenta mensagens respeitando MAX_STORED (corta as mais antigas). */

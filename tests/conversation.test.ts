@@ -80,3 +80,14 @@ describe("parseCompaction", () => {
     expect(parseCompaction("só texto")).toEqual({ resumo: "só texto", notas: [] });
   });
 });
+
+describe("mensagens internas (falas do grupo)", () => {
+  it("ficam fora do contexto e não contam para compactar", () => {
+    let conv = emptyConversation("g");
+    for (let i = 0; i < COMPACT_AT - 1; i++) {
+      conv = appendMessages(conv, msg(i), { role: "assistant", content: `fala${i}`, at: i, interna: true });
+    }
+    expect(buildContext(conv, "x").map((m) => m.content).join()).not.toContain("fala");
+    expect(needsCompaction(conv)).toBe(false);
+  });
+});
