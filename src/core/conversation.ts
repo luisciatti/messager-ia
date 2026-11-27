@@ -31,6 +31,8 @@ export interface StoredMessage {
   tier?: ModelTier;
   /** 👍 (1) ou 👎 (-1) do usuário. */
   feedback?: 1 | -1;
+  /** Síntese revisada após réplica. */
+  replica?: boolean;
   /** Fala individual de agente no grupo: exibida, mas fora do contexto (a síntese já a cobre). */
   interna?: boolean;
 }
