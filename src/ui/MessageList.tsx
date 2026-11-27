@@ -66,7 +66,17 @@ function Thread({ itens }: { itens: ThreadItem[] }) {
   );
 }
 
-export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactNode; extra?: ReactNode }) {
+export function MessageList({
+  rows,
+  vazio,
+  extra,
+  ocultas,
+}: {
+  rows: Row[];
+  vazio: ReactNode;
+  extra?: ReactNode;
+  ocultas?: { n: number; mostrando: boolean; alternar: () => void };
+}) {
   const fimRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     fimRef.current?.scrollIntoView({ block: "end" });
@@ -74,6 +84,13 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
 
   return (
     <div className="mensagens" role="log">
+      {ocultas && ocultas.n > 0 && (
+        <div className="ocultas">
+          <button onClick={ocultas.alternar}>
+            {ocultas.mostrando ? "Ocultar mensagens antes do /clear" : `Mostrar ${ocultas.n} mensagens anteriores ao /clear`}
+          </button>
+        </div>
+      )}
       {rows.length === 0 && !extra && <div className="vazio">{vazio}</div>}
       {rows.map((r, i) => {
         const ant = rows[i - 1];

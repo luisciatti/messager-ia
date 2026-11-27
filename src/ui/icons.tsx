@@ -24,3 +24,9 @@ export const IconImage = () => (
 export const IconDiagram = () => (
   <svg {...base}><rect x="1.5" y="2.5" width="5" height="4" rx="1" /><rect x="9.5" y="9.5" width="5" height="4" rx="1" /><path d="M4 6.5v4.5h5.5" /></svg>
 );
+export const IconDoc = () => (
+  <svg {...base}><path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" /><path d="M9.5 1.5v3h3M6 8h4.5M6 10.5h4.5" /></svg>
+);
+export const IconBroom = () => (
+  <svg {...base}><path d="M10.5 1.5 7.5 7.5" /><path d="M5 7.5h5l2 7H3z" /><path d="M6 10.5l-.5 4M9 10.5l.5 4" /></svg>
+);

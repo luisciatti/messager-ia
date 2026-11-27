@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ImagesUnsupportedError } from "../adapters/claude";
 import { BudgetExceededError } from "../core/budget";
 import { loadConversation } from "../core/chat";
-import type { Conversation } from "../core/conversation";
+import { visibleFrom, type Conversation } from "../core/conversation";
 import { groupKey, sendGroup, type GroupEvent } from "../core/group";
 import type { GroupDef } from "../core/groups";
 import { Avatar } from "./Avatar";
 import { Composer } from "./Composer";
-import { IconHash } from "./icons";
+import { IconBroom, IconDoc, IconHash } from "./icons";
+import { useTopic } from "./useTopic";
 import { MessageList, type Row, type ThreadItem } from "./MessageList";
 import type { Anexo } from "./prepareImage";
 import type { Services } from "./services";
@@ -28,6 +29,16 @@ export function GroupView({ services, group }: { services: Services; group: Grou
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [anexoEnviado, setAnexoEnviado] = useState<Anexo | null>(null);
   const [diagrama, setDiagrama] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [mostrarAntigas, setMostrarAntigas] = useState(false);
+  const topico = useTopic(services, groupKey(group.id), "sintetizador", setConv, group.id);
+
+  async function comando(c: "clear" | "doc") {
+    setErro(null);
+    setAviso(c === "clear" ? "Arquivando e limpando…" : "Gerando doc…");
+    setAviso(await topico.executar(c));
+    setMostrarAntigas(false);
+  }
   const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "sintetizador" ? "Síntese" : id === "visao" ? "Visão" : id);
 
   useEffect(() => {
@@ -51,6 +62,7 @@ export function GroupView({ services, group }: { services: Services; group: Grou
     const t = texto.trim();
     if ((!t && !anexo) || prog) return;
     setErro(null);
+    setAviso(null);
     setEnviado(t);
     setTexto("");
     const img = anexo;
@@ -82,11 +94,13 @@ export function GroupView({ services, group }: { services: Services; group: Grou
   }
 
   // Falas internas viram "thread" da mensagem final que vem logo depois delas.
+  const inicio = conv && !mostrarAntigas ? visibleFrom(conv) : 0;
   const rows = useMemo<Row[]>(() => {
     if (!conv) return [];
     const out: Row[] = [];
     let pend: ThreadItem[] = [];
     conv.mensagens.forEach((m, i) => {
+      if (i < inicio) return;
       if (m.interna) {
         pend.push({ autorId: m.agentId ?? "", autorNome: nome(m.agentId ?? ""), texto: m.content, tokens: m.tokens });
         return;
@@ -106,7 +120,7 @@ export function GroupView({ services, group }: { services: Services; group: Grou
       pend = [];
     });
     return out;
-  }, [conv, services]);
+  }, [conv, services, inicio]);
 
   const status = prog
     ? prog.falantes
@@ -157,10 +171,19 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         <p className="canal-desc">
           {group.membros.map(nome).join(", ")} · use @{group.membros[0]} para chamar alguém direto
         </p>
+        <div className="canal-acoes">
+          <button onClick={() => void comando("doc")} disabled={topico.ocupado || !!prog} title="Cria um doc do assunto atual (/doc)">
+            <IconDoc /> Gerar doc
+          </button>
+          <button onClick={() => void comando("clear")} disabled={topico.ocupado || !!prog} title="Limpa a conversa e guarda o que importa na memória (/clear)">
+            <IconBroom /> Limpar
+          </button>
+        </div>
       </header>
 
       <MessageList
         rows={rows}
+        ocultas={conv ? { n: visibleFrom(conv), mostrando: mostrarAntigas, alternar: () => setMostrarAntigas((v) => !v) } : undefined}
         extra={extra}
         vazio={
           <>
@@ -174,18 +197,20 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         }
       />
 
+      {aviso && <p className="faixa faixa-aviso">{aviso}</p>}
       {erro && <p className="faixa faixa-erro">{erro}</p>}
 
       <Composer
         valor={texto}
         placeholder={`Mensagem para #${group.nome.toLowerCase()}`}
-        desabilitado={!!prog}
+        desabilitado={!!prog || topico.ocupado}
         anexo={anexo}
         diagrama={diagrama}
         onAnexo={setAnexo}
         onDiagrama={setDiagrama}
         onChange={setTexto}
         onEnviar={() => void enviar()}
+        onComando={(c) => void comando(c)}
       />
     </section>
   );
