@@ -76,7 +76,7 @@ describe("sendGroup", () => {
     expect(r.sintetizou).toBe(false);
     expect(log.entries()).toHaveLength(1);
     expect(requests[0].system).not.toContain("PASSO");
-    expect(requests[0].system).toContain("claro e direto");
+    expect(requests[0].system).toContain("até ~120 palavras");
   });
 
   it("descarta PASSO e, sobrando 1, não sintetiza", async () => {

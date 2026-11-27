@@ -28,6 +28,14 @@ export const STYLE_RULES: Record<AgentStyle, string> = {
   json: "Responda só JSON válido, nada fora dele.",
 };
 
+/**
+ * Estilo de tudo que o USUÁRIO lê (1:1, falante único no grupo, síntese).
+ * Limite explícito + pergunta de esclarecimento: pesquisas mostram que restrição
+ * de tamanho mantém a precisão e que modelos raramente perguntam sem serem instruídos.
+ */
+export const USER_STYLE =
+  "Para o usuário: até ~120 palavras. Pergunta ampla ou sem contexto: explique o essencial em 2-4 frases e faça 1 pergunta sobre o caso dele. Aprofunde só se pedir. Markdown leve: no máximo 1 lista curta, sem títulos.";
+
 /** Formato no grupo: curto e com saída para "nada a acrescentar" (S²-MAD). */
 export const GROUP_RULE =
   "No grupo: até 5 linhas (posição, motivo, risco). Se nada novo a acrescentar, responda só PASSO.";
@@ -92,10 +100,16 @@ export function parseAgent(source: string, file = "agente"): AgentDef {
   };
 }
 
-/** Monta o system prompt: instruções + estilo + (grupo) + índice de skills. */
+/**
+ * Monta o system prompt: instruções + estilo + (grupo) + índice de skills.
+ * O "estilo" do agente vale só para falas internas do grupo; o que o usuário
+ * lê usa sempre USER_STYLE.
+ */
 export function buildSystemPrompt(agent: AgentDef, mode: ChatMode): string {
-  const parts = [agent.instrucoes, STYLE_RULES[agent.estilo]];
-  if (mode === "grupo" && agent.papel === "especialista") parts.push(GROUP_RULE);
+  const interna = mode === "grupo" && agent.papel === "especialista";
+  const estilo = agent.estilo === "json" ? STYLE_RULES.json : interna ? STYLE_RULES[agent.estilo] : USER_STYLE;
+  const parts = [agent.instrucoes, estilo];
+  if (interna) parts.push(GROUP_RULE);
   // Só o índice: conteúdo completo das skills será carregado sob demanda.
   if (agent.skills.length) parts.push(`Skills: ${agent.skills.join(", ")}.`);
   return parts.join("\n");

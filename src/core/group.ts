@@ -8,7 +8,7 @@
  * Orçamento: GROUP_BUDGET (moderador + até 3 + síntese = 5).
  */
 
-import { buildSystemPrompt, STYLE_RULES, type AgentDef } from "./agents";
+import { buildSystemPrompt, type AgentDef } from "./agents";
 import { BudgetTracker, COMPACTION_BUDGET, GROUP_BUDGET } from "./budget";
 import { loadConversation, maybeCompact, systemWithMemory, type ChatDeps } from "./chat";
 import { appendMessages, buildContext, type Conversation, type StoredMessage } from "./conversation";
@@ -96,7 +96,7 @@ export async function sendGroup(
     const agent = deps.agents.get(id)!;
     // sozinho: responde direto ao usuário em linguagem normal (sem síntese)
     const base = sozinho
-      ? buildSystemPrompt({ ...agent, estilo: "normal" }, "direto")
+      ? buildSystemPrompt(agent, "direto")
       : buildSystemPrompt(agent, "grupo");
     const { system } = await systemWithMemory(deps, base, texto);
     reqs.push({ id, req: { system, messages: contexto, modelTier: agent.tier } });
@@ -136,7 +136,7 @@ export async function sendGroup(
     const falasTxt = validas.map((f) => `[${deps.agents.get(f.id)!.nome}]: ${f.texto}`).join("\n\n");
     const res = await deps.metered.ask(
       {
-        system: `${synth.instrucoes}\n${STYLE_RULES[synth.estilo]}`,
+        system: buildSystemPrompt(synth, "direto"),
         messages: [{ role: "user", content: `Pergunta: ${texto}\n\nFalas:\n${falasTxt}` }],
         modelTier: synth.tier,
         onText: (t) => onEvent?.({ tipo: "sintese", texto: t }),
