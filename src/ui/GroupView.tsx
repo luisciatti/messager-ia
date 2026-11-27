@@ -4,6 +4,7 @@ import { BudgetExceededError } from "../core/budget";
 import { loadConversation } from "../core/chat";
 import { visibleFrom, type Conversation } from "../core/conversation";
 import { groupKey, sendGroup, type GroupEvent } from "../core/group";
+import { requestReplica } from "../core/replica";
 import type { GroupDef } from "../core/groups";
 import { Avatar } from "./Avatar";
 import { Composer } from "./Composer";
@@ -33,6 +34,29 @@ export function GroupView({ services, group }: { services: Services; group: Grou
   const [aviso, setAviso] = useState<string | null>(null);
   const [mostrarAntigas, setMostrarAntigas] = useState(false);
   const topico = useTopic(services, groupKey(group.id), "sintetizador", setConv, group.id);
+
+  const [revisando, setRevisando] = useState(false);
+
+  async function replica() {
+    if (prog || revisando) return;
+    setErro(null);
+    setAviso("Agentes revisando a resposta…");
+    setRevisando(true);
+    try {
+      const r = await requestReplica(services, group.id);
+      setConv(r.conversa);
+      setAviso(
+        r.revisou
+          ? `Réplica: ${r.objecoes.map((o) => nome(o.agentId)).join(", ")} apontou ajuste; síntese revisada.`
+          : "Réplica: todos confirmaram a resposta. Nada mudou.",
+      );
+    } catch (e) {
+      setAviso(null);
+      setErro(e instanceof BudgetExceededError ? e.message : "Não consegui pedir a réplica agora.");
+    } finally {
+      setRevisando(false);
+    }
+  }
 
   async function comando(c: "clear" | "doc") {
     setErro(null);
@@ -115,7 +139,7 @@ export function GroupView({ services, group }: { services: Services; group: Grou
       out.push({
         key: `${i}-${m.at}`,
         autorId: deUsuario ? "voce" : m.agentId ?? "sintetizador",
-        autorNome: deUsuario ? "Você" : nome(m.agentId ?? "sintetizador"),
+        autorNome: deUsuario ? "Você" : m.replica ? "Síntese revisada" : nome(m.agentId ?? "sintetizador"),
         at: m.at,
         texto: m.content,
         tokens: deUsuario ? undefined : m.tokens,
@@ -128,6 +152,9 @@ export function GroupView({ services, group }: { services: Services; group: Grou
       });
       pend = [];
     });
+    // "Pedir réplica" só na última resposta final.
+    const ultima = out.at(-1);
+    if (ultima && ultima.autorId !== "voce") ultima.onReplica = () => void replica();
     return out;
   }, [conv, services, inicio]);
 
@@ -212,7 +239,7 @@ export function GroupView({ services, group }: { services: Services; group: Grou
       <Composer
         valor={texto}
         placeholder={`Mensagem para #${group.nome.toLowerCase()}`}
-        desabilitado={!!prog || topico.ocupado}
+        desabilitado={!!prog || topico.ocupado || revisando}
         anexo={anexo}
         diagrama={diagrama}
         onAnexo={setAnexo}
