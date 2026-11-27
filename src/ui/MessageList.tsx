@@ -28,6 +28,7 @@ export interface Row {
   onVoto?: (v: 1 | -1) => void;
   leve?: boolean;
   onRefazer?: () => void;
+  onReplica?: () => void;
 }
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -129,6 +130,11 @@ export function MessageList({
                 )}
                 {r.texto && <Markdown texto={r.texto} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}
+                {r.onReplica && (
+                  <button className="refazer" onClick={r.onReplica} title="Os agentes revisam esta resposta; só falam se discordarem (2 a 4 chamadas)">
+                    Pedir réplica
+                  </button>
+                )}
                 {r.onRefazer && (
                   <button className="refazer" onClick={r.onRefazer} title="Pergunta de novo no modelo padrão (1 chamada a mais)">
                     Refazer no modelo padrão
