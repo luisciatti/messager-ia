@@ -259,3 +259,19 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--acento);
 .voto-dado svg { width: 13px; height: 13px; }
 .refazer { margin-top: 4px; border: none; background: transparent; color: var(--acento); font-size: 13px; font-weight: 700; padding: 2px 0; cursor: pointer; }
 .refazer:hover { text-decoration: underline; }
+
+/* novo agente */
+.form-agente { display: flex; flex-direction: column; gap: 14px; max-width: 640px; }
+.form-agente label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 700; }
+.form-agente label.check { flex-direction: row; align-items: flex-start; gap: 8px; font-weight: 400; }
+.form-agente label.check input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.form-agente input:not([type="checkbox"]), .form-agente textarea { font: inherit; font-size: 16px; font-weight: 400; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; background: var(--fundo); color: var(--texto); }
+.form-agente button[type="submit"] { align-self: flex-start; }
+.form-agente details summary { cursor: pointer; color: var(--acento); font-size: 13px; }
+.contador { font-size: 13px; color: var(--sutil); }
+.contador.alerta { color: var(--erro); font-weight: 700; }
+.form-agente .alerta { margin: 0; }
+.mais { width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: 6px; background: #ffffff1f; font-weight: 700; }
+.canal-acoes button.perigo { border-color: var(--erro); color: var(--erro); }
+.painel .md-code code { border: none; background: none; padding: 0; color: var(--texto); }
+.form-agente .md-code { white-space: pre-wrap; font-size: 13px; }

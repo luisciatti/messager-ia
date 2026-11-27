@@ -4,6 +4,7 @@ import { ChatView } from "./ChatView";
 import { GroupView } from "./GroupView";
 import { IconChart, IconDoc, IconHash, IconMemory, IconMenu } from "./icons";
 import { DocsPanel } from "./DocsPanel";
+import { AgentForm } from "./AgentForm";
 import { MemoryPanel } from "./MemoryPanel";
 import { createServices, metaHoje, type Services } from "./services";
 import { TokensPanel } from "./TokensPanel";
@@ -12,7 +13,7 @@ export function App() {
   const [services, setServices] = useState<Services | null>(null);
   const [selecionado, setSelecionado] = useState("grupo:cloud");
   const [menuAberto, setMenuAberto] = useState(false);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     createServices().then(setServices);
@@ -23,7 +24,8 @@ export function App() {
 
   const contatos = useMemo(
     () => (services ? [...services.agents.values()].filter((a) => a.papel === "especialista") : []),
-    [services],
+    // tick: recalcula quando um agente é criado ou removido
+    [services, tick],
   );
 
   if (!services) return <p className="carregando">Carregando…</p>;
@@ -43,8 +45,29 @@ export function App() {
   if (selecionado === "memoria") principal = <MemoryPanel services={services} />;
   else if (selecionado === "tokens") principal = <TokensPanel services={services} />;
   else if (selecionado === "docs") principal = <DocsPanel services={services} />;
+  else if (selecionado === "novo-agente")
+    principal = (
+      <AgentForm
+        services={services}
+        onCriado={(id) => {
+          setTick((t) => t + 1);
+          ir(id);
+        }}
+      />
+    );
   else if (grupoId && services.groups.has(grupoId)) principal = <GroupView key={selecionado} services={services} group={services.groups.get(grupoId)!} />;
-  else principal = <ChatView key={(agente ?? contatos[0]).id} services={services} agent={agente ?? contatos[0]} />;
+  else
+    principal = (
+      <ChatView
+        key={(agente ?? contatos[0]).id}
+        services={services}
+        agent={agente ?? contatos[0]}
+        onRemovido={() => {
+          setTick((t) => t + 1);
+          ir("grupo:cloud");
+        }}
+      />
+    );
 
   return (
     <div className={`app ${menuAberto ? "menu-aberto" : ""}`}>
@@ -88,6 +111,9 @@ export function App() {
               {a.nome}
             </button>
           ))}
+          <button className={item("novo-agente")} onClick={() => ir("novo-agente")}>
+            <span className="mais">+</span> Novo agente
+          </button>
         </nav>
       </aside>
 
