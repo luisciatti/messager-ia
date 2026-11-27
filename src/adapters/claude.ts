@@ -77,12 +77,38 @@ export function createArtifactClient(sample: SampleFn): ClaudeClient {
   };
 }
 
-export function createMockClient(): ClaudeClient {
+/**
+ * Mock que imita cada papel, para testar o fluxo inteiro localmente sem gastar:
+ * moderador escolhe por palavra-chave, resumo devolve JSON, síntese junta as falas.
+ */
+export function mockReply(req: AskRequest): string {
+  const last = req.messages.at(-1)?.content ?? "";
+  if (req.system.includes('"falam"')) {
+    const linhas = [...last.matchAll(/^([a-z0-9_-]+): (.*)$/gm)];
+    const pergunta = (last.split("Pergunta:")[1] ?? "").toLowerCase();
+    const escolhidos = linhas
+      .filter(([, id, skills]) => pergunta.includes(id) || skills.split(", ").some((s) => pergunta.includes(s.split("-")[0])))
+      .map(([, id]) => id);
+    const falam = escolhidos.length ? escolhidos : linhas.slice(0, 2).map(([, id]) => id);
+    return JSON.stringify({ falam, motivo: "simulado por palavra-chave" });
+  }
+  if (req.system.includes("Resuma a conversa")) {
+    return JSON.stringify({ resumo: "(simulado) resumo da conversa.", notas: [] });
+  }
+  if (req.system.includes("Una as falas")) {
+    const nomes = [...last.matchAll(/^\[([^\]]+)\]:/gm)].map((m) => m[1]);
+    return `(simulado) Síntese das falas de ${nomes.join(", ")}. No artifact, o Claude une as posições de verdade.`;
+  }
+  const pergunta = last.split("\n\n").at(-1) ?? last;
+  return `(simulado) Resposta de teste para: "${pergunta.slice(0, 120)}". No artifact, o Claude responde de verdade.`;
+}
+
+export function createMockClient(delayMs = typeof window === "undefined" ? 0 : 500): ClaudeClient {
   return {
     mode: "mock",
     async ask(req) {
-      const last = req.messages.at(-1)?.content ?? "";
-      const text = `[mock] recebi: "${last.slice(0, 80)}"`;
+      const text = mockReply(req);
+      if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
       req.onText?.(text);
       return { text, truncated: false };
     },

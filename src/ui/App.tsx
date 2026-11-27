@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { Avatar } from "./Avatar";
 import { ChatView } from "./ChatView";
 import { GroupView } from "./GroupView";
+import { IconChart, IconHash, IconMemory, IconMenu } from "./icons";
 import { MemoryPanel } from "./MemoryPanel";
-import { TokensPanel } from "./TokensPanel";
-import { Avatar } from "./Avatar";
 import { createServices, type Services } from "./services";
+import { TokensPanel } from "./TokensPanel";
 
 export function App() {
   const [services, setServices] = useState<Services | null>(null);
-  const [selecionado, setSelecionado] = useState("aws");
+  const [selecionado, setSelecionado] = useState("grupo:cloud");
+  const [menuAberto, setMenuAberto] = useState(false);
 
   useEffect(() => {
     createServices().then(setServices);
@@ -20,59 +22,73 @@ export function App() {
   );
 
   if (!services) return <p className="carregando">Carregando…</p>;
-  const agente = services.agents.get(selecionado) ?? contatos[0];
+
+  const ir = (id: string) => {
+    setSelecionado(id);
+    setMenuAberto(false);
+  };
+  const item = (id: string) => `item ${selecionado === id ? "ativo" : ""}`;
+  const grupoId = selecionado.startsWith("grupo:") ? selecionado.slice(6) : null;
+  const agente = services.agents.get(selecionado);
+  const mock = services.client.mode === "mock";
+
+  let principal;
+  if (selecionado === "memoria") principal = <MemoryPanel services={services} />;
+  else if (selecionado === "tokens") principal = <TokensPanel services={services} />;
+  else if (grupoId && services.groups.has(grupoId)) principal = <GroupView key={selecionado} services={services} group={services.groups.get(grupoId)!} />;
+  else principal = <ChatView key={(agente ?? contatos[0]).id} services={services} agent={agente ?? contatos[0]} />;
 
   return (
-    <div className="app">
-      <aside className="contatos">
-        <header>
+    <div className={`app ${menuAberto ? "menu-aberto" : ""}`}>
+      <aside className="lateral">
+        <header className="espaco">
           <strong>Messager de IA</strong>
           <small>
-            Claude: {services.client.mode} · dados: {services.storage.mode}
+            <span className={`ponto ${mock ? "ponto-mock" : ""}`} /> {mock ? "Modo simulado" : "Claude conectado"}
           </small>
         </header>
-        <ul>
+
+        <nav>
+          <button className={item("memoria")} onClick={() => ir("memoria")}>
+            <IconMemory /> Memória
+          </button>
+          <button className={item("tokens")} onClick={() => ir("tokens")}>
+            <IconChart /> Uso de tokens
+          </button>
+
+          <h2>Canais</h2>
           {[...services.groups.values()].map((g) => (
-            <li key={g.id}>
-              <button className={selecionado === `grupo:${g.id}` ? "ativo" : ""} onClick={() => setSelecionado(`grupo:${g.id}`)}>
-                <Avatar id="grupo" label={g.nome} />
-                <span>
-                  <strong>{g.nome}</strong>
-                  <small>Grupo · {g.membros.length} agentes</small>
-                </span>
-              </button>
-            </li>
+            <button key={g.id} className={item(`grupo:${g.id}`)} onClick={() => ir(`grupo:${g.id}`)}>
+              <IconHash /> {g.nome.toLowerCase()}
+            </button>
           ))}
+
+          <h2>Mensagens diretas</h2>
           {contatos.map((a) => (
-            <li key={a.id}>
-              <button className={a.id === selecionado ? "ativo" : ""} onClick={() => setSelecionado(a.id)}>
-                <Avatar id={a.id} label={a.nome} />
-                <span>
-                  <strong>{a.nome}</strong>
-                  <small>{a.skills.slice(0, 3).join(", ")}</small>
-                </span>
-              </button>
-            </li>
+            <button key={a.id} className={item(a.id)} onClick={() => ir(a.id)}>
+              <span className="dm-avatar">
+                <Avatar id={a.id} label={a.nome} size={20} />
+                <span className="online" />
+              </span>
+              {a.nome}
+            </button>
           ))}
-        </ul>
-        <nav className="atalhos">
-          <button className={selecionado === "memoria" ? "ativo" : ""} onClick={() => setSelecionado("memoria")}>
-            🧠 Memória
-          </button>
-          <button className={selecionado === "tokens" ? "ativo" : ""} onClick={() => setSelecionado("tokens")}>
-            📊 Uso de tokens
-          </button>
         </nav>
       </aside>
-      {selecionado === "memoria" ? (
-        <MemoryPanel services={services} />
-      ) : selecionado === "tokens" ? (
-        <TokensPanel services={services} />
-      ) : selecionado.startsWith("grupo:") && services.groups.has(selecionado.slice(6)) ? (
-        <GroupView key={selecionado} services={services} group={services.groups.get(selecionado.slice(6))!} />
-      ) : (
-        <ChatView key={agente.id} services={services} agent={agente} />
-      )}
+
+      <main className="principal">
+        <button className="abrir-menu" onClick={() => setMenuAberto((m) => !m)} aria-label="Abrir menu">
+          <IconMenu />
+        </button>
+        {mock && (
+          <p className="faixa faixa-mock">
+            Modo simulado: fora do artifact as respostas são de teste e não gastam tokens. Para o Claude de verdade, abra o
+            artifact no claude.ai.
+          </p>
+        )}
+        {principal}
+      </main>
+      {menuAberto && <div className="sombra" onClick={() => setMenuAberto(false)} />}
     </div>
   );
 }

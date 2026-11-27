@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  mockReply,
   buildInput,
   createArtifactClient,
   createClaudeClient,
@@ -41,5 +42,20 @@ describe("createClaudeClient", () => {
     const res = await client.ask({ system: "x", messages: [{ role: "user", content: "oi" }] });
     expect(res.text).toBe("resposta");
     expect(sample.mock.calls[0][1]).toMatchObject({ modelTier: "default", cache: false });
+  });
+});
+
+describe("mockReply", () => {
+  it("imita o moderador escolhendo por palavra-chave", () => {
+    const txt = mockReply({
+      system: 'Formato: {"falam":["id"]}',
+      messages: [{ role: "user", content: "Agentes:\naws: custos, rds\noci: vcn\ndevops: terraform\n\nPergunta: backup do rds com terraform" }],
+    });
+    expect(JSON.parse(txt).falam).toEqual(["aws", "devops"]);
+  });
+
+  it("devolve JSON no resumo", () => {
+    const txt = mockReply({ system: "Resuma a conversa em até 120 palavras", messages: [{ role: "user", content: "x" }] });
+    expect(JSON.parse(txt)).toHaveProperty("resumo");
   });
 });
