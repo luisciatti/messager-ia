@@ -6,6 +6,7 @@ import { createMeteredClient, type MeteredClient } from "../core/metered";
 import { agents, groups } from "../core/registry";
 import { UsageLog } from "../core/tokens";
 import { loadRecentUsage, persistUsage } from "../core/usageStore";
+import { inicioDoDia, loadConfig, statusMeta, type Config } from "../core/settings";
 import type { GroupDeps } from "../core/group";
 
 export interface Services extends GroupDeps {
@@ -14,6 +15,8 @@ export interface Services extends GroupDeps {
   metered: MeteredClient;
   log: UsageLog;
   images: ImageStore;
+  /** Mutável: atualizado ao salvar na aba de tokens. */
+  config: Config;
 }
 
 export async function createServices(): Promise<Services> {
@@ -22,5 +25,21 @@ export async function createServices(): Promise<Services> {
   const salvos = await loadRecentUsage(storage).catch(() => []);
   log.hydrate(salvos);
   persistUsage(log, storage, salvos);
-  return { client, storage, log, images, agents, groups, memory: new MemoryStore(storage), metered: createMeteredClient(client, log) };
+  const config = await loadConfig(storage).catch(() => ({ metaDiaria: 20000, pausarNaMeta: false }));
+  return { client, storage, log, images, config, agents, groups, memory: new MemoryStore(storage), metered: createMeteredClient(client, log) };
+}
+
+/** Uso de hoje contra a meta diária (0 tokens: só soma o log local). */
+export function metaHoje(services: Services) {
+  const ini = inicioDoDia();
+  const usado = services.log.totals((e) => e.at >= ini).total;
+  return { usado, meta: services.config.metaDiaria, ...statusMeta(usado, services.config.metaDiaria) };
+}
+
+/** Mensagem de bloqueio, se a pausa na meta estiver ligada e a meta estourada. */
+export function bloqueioMeta(services: Services): string | null {
+  const m = metaHoje(services);
+  return services.config.pausarNaMeta && m.nivel === "estourado"
+    ? `Meta diária atingida (~${m.usado.toLocaleString("pt-BR")} de ${m.meta.toLocaleString("pt-BR")} tokens). Ajuste em Uso de tokens.`
+    : null;
 }

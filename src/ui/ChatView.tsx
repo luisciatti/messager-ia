@@ -11,7 +11,8 @@ import { IconBroom, IconDoc } from "./icons";
 import { useTopic } from "./useTopic";
 import { MessageList, type Row } from "./MessageList";
 import type { Anexo } from "./prepareImage";
-import type { Services } from "./services";
+import { bloqueioMeta, type Services } from "./services";
+import { votar } from "../core/feedback";
 
 export function ChatView({ services, agent }: { services: Services; agent: AgentDef }) {
   const [conv, setConv] = useState<Conversation | null>(null);
@@ -49,6 +50,11 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
     if ((!t && !anexo) || enviando) return;
     setErro(null);
     setAviso(null);
+    const bloqueio = bloqueioMeta(services);
+    if (bloqueio) {
+      setErro(bloqueio);
+      return;
+    }
     if (!ignorarFixada && !anexo) {
       const f = findFixada((await services.memory.load()).fixadas, agent.id, t);
       if (f) {
@@ -112,7 +118,12 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
         reaproveitada: m.reaproveitada,
         imagemUrl: m.imagem?.url,
         imagemTokens: m.imagem?.tokens,
+        feedback: m.feedback,
+        leve: !deUsuario && m.tier === "quick",
       };
+      if (!deUsuario && !m.reaproveitada) {
+        row.onVoto = async (v) => setConv(await votar(services.storage, directKey(agent.id), conv, i, v));
+      }
       if (!deUsuario && !m.reaproveitada) {
         row.onPin = async () => {
           const pergunta = [...conv.mensagens.slice(0, i)].reverse().find((x) => x.role === "user");

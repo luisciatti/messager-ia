@@ -5,17 +5,21 @@ import { GroupView } from "./GroupView";
 import { IconChart, IconDoc, IconHash, IconMemory, IconMenu } from "./icons";
 import { DocsPanel } from "./DocsPanel";
 import { MemoryPanel } from "./MemoryPanel";
-import { createServices, type Services } from "./services";
+import { createServices, metaHoje, type Services } from "./services";
 import { TokensPanel } from "./TokensPanel";
 
 export function App() {
   const [services, setServices] = useState<Services | null>(null);
   const [selecionado, setSelecionado] = useState("grupo:cloud");
   const [menuAberto, setMenuAberto] = useState(false);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     createServices().then(setServices);
   }, []);
+
+  // Atualiza o medidor da meta a cada nova chamada registrada.
+  useEffect(() => (services ? services.log.subscribe(() => setTick((t) => t + 1)) : undefined), [services]);
 
   const contatos = useMemo(
     () => (services ? [...services.agents.values()].filter((a) => a.papel === "especialista") : []),
@@ -32,6 +36,8 @@ export function App() {
   const grupoId = selecionado.startsWith("grupo:") ? selecionado.slice(6) : null;
   const agente = services.agents.get(selecionado);
   const mock = services.client.mode === "mock";
+  const meta = metaHoje(services);
+  const k = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k` : String(n));
 
   let principal;
   if (selecionado === "memoria") principal = <MemoryPanel services={services} />;
@@ -59,6 +65,10 @@ export function App() {
           </button>
           <button className={item("tokens")} onClick={() => ir("tokens")}>
             <IconChart /> Uso de tokens
+          </button>
+          <button className={`medidor medidor-${meta.nivel}`} onClick={() => ir("tokens")} title="Uso de hoje contra a meta diária">
+            <span className="medidor-barra"><span style={{ width: `${Math.min(100, meta.pct * 100)}%` }} /></span>
+            <small>Hoje ~{k(meta.usado)} de {k(meta.meta)}</small>
           </button>
 
           <h2>Canais</h2>

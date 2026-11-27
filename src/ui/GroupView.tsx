@@ -11,7 +11,8 @@ import { IconBroom, IconDoc, IconHash } from "./icons";
 import { useTopic } from "./useTopic";
 import { MessageList, type Row, type ThreadItem } from "./MessageList";
 import type { Anexo } from "./prepareImage";
-import type { Services } from "./services";
+import { bloqueioMeta, type Services } from "./services";
+import { votar } from "../core/feedback";
 
 interface Progresso {
   falantes?: string[];
@@ -63,6 +64,11 @@ export function GroupView({ services, group }: { services: Services; group: Grou
     if ((!t && !anexo) || prog) return;
     setErro(null);
     setAviso(null);
+    const bloqueio = bloqueioMeta(services);
+    if (bloqueio) {
+      setErro(bloqueio);
+      return;
+    }
     setEnviado(t);
     setTexto("");
     const img = anexo;
@@ -116,6 +122,9 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         thread: pend.length ? pend : undefined,
         imagemUrl: m.imagem?.url,
         imagemTokens: m.imagem?.tokens,
+        feedback: m.feedback,
+        leve: !deUsuario && m.tier === "quick",
+        onVoto: deUsuario ? undefined : async (v) => setConv(await votar(services.storage, groupKey(group.id), conv, i, v)),
       });
       pend = [];
     });
