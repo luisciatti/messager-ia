@@ -164,7 +164,7 @@ export async function sendGroup(
     novas.push({ role: "assistant", content: "Ninguém tinha algo novo a acrescentar.", at: now, agentId: SYNTH_ID, tokens: 0 });
   } else if (validas.length === 1) {
     const f = validas[0];
-    novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto) });
+    novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto), tier: deps.agents.get(f.id)!.tier });
   } else {
     for (const f of validas) novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto), interna: true });
     const synth = deps.agents.get(SYNTH_ID)!;
@@ -179,7 +179,7 @@ export async function sendGroup(
       { agentId: SYNTH_ID, groupId, reason: "sintese" },
       budget,
     );
-    novas.push({ role: "assistant", content: res.text, at: now, agentId: SYNTH_ID, tokens: estimateTokens(res.text) });
+    novas.push({ role: "assistant", content: res.text, at: now, agentId: SYNTH_ID, tokens: estimateTokens(res.text), tier: synth.tier });
     sintetizou = true;
   }
 

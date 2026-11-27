@@ -118,7 +118,7 @@ export async function sendDirect(
       at: now,
       imagem: opts.imagem ? { url: opts.imagem.url, tokens: opts.imagem.tokens } : undefined,
     },
-    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text) },
+    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text), tier: agent.tier },
   );
 
   const c = await maybeCompact(deps, conv, agentId, budget);
