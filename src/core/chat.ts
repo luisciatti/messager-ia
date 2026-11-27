@@ -17,6 +17,8 @@ import {
   type Conversation,
 } from "./conversation";
 import type { ImagemEnvio } from "./images";
+import { routeTier } from "./routing";
+import type { ModelTier } from "../adapters/claude";
 import { memoryBlock, searchDocs, searchNotes, type Fixada, type MemoryStore } from "./memory";
 import type { MeteredClient } from "./metered";
 import { estimateTokens } from "./tokens";
@@ -77,6 +79,8 @@ export interface SendOptions {
   imagem?: ImagemEnvio;
   /** Pede um diagrama Mermaid na resposta (só quando o usuário liga). */
   diagrama?: boolean;
+  /** Ignora o roteamento (ex.: "refazer no modelo padrão"). */
+  forcarTier?: ModelTier;
 }
 
 export async function sendDirect(
@@ -95,12 +99,13 @@ export async function sendDirect(
   const base = buildSystemPrompt(agent, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : "");
   const { system, notasUsadas, docsUsados } = await systemWithMemory(deps, base, texto);
   const pergunta = texto || (opts.imagem ? IMAGE_ONLY_TEXT : "");
+  const tier = opts.forcarTier ?? routeTier(texto, agent.tier, { imagem: !!opts.imagem, diagrama: opts.diagrama });
 
   const res = await deps.metered.ask(
     {
       system,
       messages: buildContext(conv, pergunta),
-      modelTier: agent.tier,
+      modelTier: tier,
       onText,
       images: opts.imagem ? [opts.imagem.blob] : undefined,
       imageTokens: opts.imagem?.tokens,
@@ -118,7 +123,7 @@ export async function sendDirect(
       at: now,
       imagem: opts.imagem ? { url: opts.imagem.url, tokens: opts.imagem.tokens } : undefined,
     },
-    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text), tier: agent.tier },
+    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text), tier },
   );
 
   const c = await maybeCompact(deps, conv, agentId, budget);
@@ -137,4 +142,22 @@ export async function useSaved(deps: ChatDeps, agentId: string, texto: string, f
   );
   await deps.storage.set(key, conv);
   return conv;
+}
+
+/** Desfaz a última troca (pergunta + resposta) e pergunta de novo no tier pedido. */
+export async function retryLast(
+  deps: ChatDeps,
+  agentId: string,
+  tier: ModelTier,
+  onText?: (t: string) => void,
+): Promise<SendResult> {
+  const key = directKey(agentId);
+  const conv = await loadConversation(deps.storage, key);
+  const n = conv.mensagens.length;
+  const pergunta = conv.mensagens[n - 2];
+  if (n < 2 || pergunta.role !== "user" || conv.mensagens[n - 1].role !== "assistant" || pergunta.imagem) {
+    throw new Error("nada para refazer");
+  }
+  await deps.storage.set(key, { ...conv, mensagens: conv.mensagens.slice(0, -2), compactadoAte: Math.min(conv.compactadoAte, n - 2) });
+  return sendDirect(deps, agentId, pergunta.content, onText, { forcarTier: tier });
 }

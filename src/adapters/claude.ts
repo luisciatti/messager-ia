@@ -107,7 +107,8 @@ export function mockReply(req: AskRequest): string {
       .filter(([, id, skills]) => pergunta.includes(id) || skills.split(", ").some((s) => pergunta.includes(s.split("-")[0])))
       .map(([, id]) => id);
     const falam = escolhidos.length ? escolhidos : linhas.slice(0, 2).map(([, id]) => id);
-    return JSON.stringify({ falam, motivo: "simulado por palavra-chave" });
+    const simples = /^\s*(o que (é|e)|qual a diferen|pra que serve|para que serve)/i.test(pergunta.trim());
+    return JSON.stringify({ falam, nivel: simples ? "simples" : "normal", motivo: "simulado por palavra-chave" });
   }
   if (req.system.includes("arquiva um assunto")) {
     const forcado = req.system.includes("obrigatório");

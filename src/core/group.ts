@@ -14,6 +14,7 @@ import { loadConversation, maybeCompact, systemWithMemory, type ChatDeps, type S
 import { appendMessages, buildContext, type Conversation, type StoredMessage } from "./conversation";
 import type { GroupDef } from "./groups";
 import { estimateRequestTokens } from "./metered";
+import { routeTier } from "./routing";
 import { estimateTokens } from "./tokens";
 
 export const groupKey = (groupId: string) => `conv-grupo-${groupId}`;
@@ -35,15 +36,20 @@ export function parseMentions(texto: string, membros: string[]): string[] {
 }
 
 export function parseModerator(text: string, membros: string[], max: number): string[] {
+  return parseModeratorFull(text, membros, max).falam;
+}
+
+export function parseModeratorFull(text: string, membros: string[], max: number): { falam: string[]; simples: boolean } {
   const m = text.match(/\{[\s\S]*\}/);
-  if (!m) return [];
+  if (!m) return { falam: [], simples: false };
   try {
-    const j = JSON.parse(m[0]) as { falam?: unknown };
-    if (!Array.isArray(j.falam)) return [];
+    const j = JSON.parse(m[0]) as { falam?: unknown; nivel?: unknown };
+    const simples = String(j.nivel ?? "").toLowerCase() === "simples";
+    if (!Array.isArray(j.falam)) return { falam: [], simples };
     const ids = j.falam.map((x) => String(x).toLowerCase());
-    return membros.filter((id) => ids.includes(id)).slice(0, max);
+    return { falam: membros.filter((id) => ids.includes(id)).slice(0, max), simples };
   } catch {
-    return [];
+    return { falam: [], simples: false };
   }
 }
 
@@ -80,6 +86,8 @@ export async function sendGroup(
   // 1) quem fala
   let falantes = parseMentions(texto, group.membros).slice(0, group.maxFalantes);
   const viaMencao = falantes.length > 0;
+  // Nível da pergunta: moderador decide (sem chamada extra); com @menção, regra local.
+  let simples = viaMencao && !opts.imagem && !opts.diagrama && routeTier(textoOriginal, "default") === "quick";
 
   // Imagem: com 1 agente chamado por @menção, vai direto para ele.
   // Senão, é descrita UMA vez (tier quick) e a descrição em texto segue para
@@ -102,7 +110,9 @@ export async function sendGroup(
       { agentId: MODERATOR_ID, groupId, reason: "moderacao" },
       budget,
     );
-    falantes = parseModerator(res.text, group.membros, group.maxFalantes);
+    const decisao = parseModeratorFull(res.text, group.membros, group.maxFalantes);
+    falantes = decisao.falam;
+    simples = decisao.simples && !opts.imagem && !opts.diagrama;
     if (!falantes.length) falantes = group.membros.slice(0, group.maxFalantes);
   }
   onEvent?.({ tipo: "falantes", ids: falantes, viaMencao });
@@ -123,7 +133,7 @@ export async function sendGroup(
       req: {
         system,
         messages: contexto,
-        modelTier: agent.tier,
+        modelTier: simples ? "quick" : agent.tier,
         images: imagemDireta ? [imagemDireta.blob] : undefined,
         imageTokens: imagemDireta?.tokens,
       },
@@ -164,7 +174,7 @@ export async function sendGroup(
     novas.push({ role: "assistant", content: "Ninguém tinha algo novo a acrescentar.", at: now, agentId: SYNTH_ID, tokens: 0 });
   } else if (validas.length === 1) {
     const f = validas[0];
-    novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto), tier: deps.agents.get(f.id)!.tier });
+    novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto), tier: simples ? "quick" : deps.agents.get(f.id)!.tier });
   } else {
     for (const f of validas) novas.push({ role: "assistant", content: f.texto, at: now, agentId: f.id, tokens: estimateTokens(f.texto), interna: true });
     const synth = deps.agents.get(SYNTH_ID)!;
@@ -173,13 +183,13 @@ export async function sendGroup(
       {
         system: buildSystemPrompt(synth, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : ""),
         messages: [{ role: "user", content: `Pergunta: ${texto}\n\nFalas:\n${falasTxt}` }],
-        modelTier: synth.tier,
+        modelTier: simples ? "quick" : synth.tier,
         onText: (t) => onEvent?.({ tipo: "sintese", texto: t }),
       },
       { agentId: SYNTH_ID, groupId, reason: "sintese" },
       budget,
     );
-    novas.push({ role: "assistant", content: res.text, at: now, agentId: SYNTH_ID, tokens: estimateTokens(res.text), tier: synth.tier });
+    novas.push({ role: "assistant", content: res.text, at: now, agentId: SYNTH_ID, tokens: estimateTokens(res.text), tier: simples ? "quick" : synth.tier });
     sintetizou = true;
   }
 
