@@ -11,10 +11,23 @@ import { IconBroom, IconDoc } from "./icons";
 import { useTopic } from "./useTopic";
 import { MessageList, type Row } from "./MessageList";
 import type { Anexo } from "./prepareImage";
-import { bloqueioMeta, type Services } from "./services";
+import { bloqueioMeta, recarregarAgentes, type Services } from "./services";
+import { removeCustomAgent } from "../core/customAgents";
 import { votar } from "../core/feedback";
 
-export function ChatView({ services, agent }: { services: Services; agent: AgentDef }) {
+export function ChatView({ services, agent, onRemovido }: { services: Services; agent: AgentDef; onRemovido?: () => void }) {
+  const custom = (agent as { custom?: boolean }).custom === true;
+  const [confirmar, setConfirmar] = useState(false);
+
+  async function excluir() {
+    if (!confirmar) {
+      setConfirmar(true);
+      return;
+    }
+    await removeCustomAgent(services.storage, agent.id);
+    await recarregarAgentes(services);
+    onRemovido?.();
+  }
   const [conv, setConv] = useState<Conversation | null>(null);
   const [texto, setTexto] = useState("");
   const [enviado, setEnviado] = useState<string | null>(null);
@@ -184,6 +197,11 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
           <button onClick={() => void comando("clear")} disabled={topico.ocupado || enviando} title="Limpa a conversa e guarda o que importa na memória (/clear)">
             <IconBroom /> Limpar
           </button>
+          {custom && (
+            <button onClick={() => void excluir()} onBlur={() => setConfirmar(false)} className={confirmar ? "perigo" : ""}>
+              {confirmar ? "Confirmar exclusão" : "Excluir agente"}
+            </button>
+          )}
         </div>
       </header>
 
