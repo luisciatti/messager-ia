@@ -109,6 +109,14 @@ export function mockReply(req: AskRequest): string {
     const falam = escolhidos.length ? escolhidos : linhas.slice(0, 2).map(([, id]) => id);
     return JSON.stringify({ falam, motivo: "simulado por palavra-chave" });
   }
+  if (req.system.includes("arquiva um assunto")) {
+    const forcado = req.system.includes("obrigatório");
+    const resolvido = /resolv|funcionou|corrigi|ajustei/i.test(last);
+    const doc = forcado || resolvido
+      ? { titulo: "(simulado) Erro 502 no ALB", conteudo: "**Causa:** target group sem instâncias saudáveis.\n- Ajustar health check para `/health`\n- Conferir security group do destino", tags: ["alb", "502"] }
+      : null;
+    return JSON.stringify({ notas: ["(simulado) ALB usa health check em /health"], doc });
+  }
   if (req.system.includes("Descreva a imagem")) {
     return "(simulado) Print de tela com um painel e uma mensagem de erro.";
   }
