@@ -41,6 +41,11 @@ npm run build      # gera dist/ para publicar no artifact
   extraídas das conversas (entram só quando relevantes, busca local) e respostas
   fixadas 📌 reaproveitáveis com 0 tokens.
 - **Uso de tokens**: consumo estimado por agente, motivo e conversa (hoje / 7 dias).
+- **🔎 Verificar na web**: sob demanda, busca no conector Parallel Search do usuário
+  (capacidade `mcp` do artifact), recorta 3 fontes (~600 caracteres cada) e revisa a
+  última resposta com citações [n]. ~1 mil tokens por verificação; o botão fica em
+  destaque quando a pergunta fala de preço, versão, limite ou "atual". Sem o conector,
+  o botão não aparece.
 
 ## Tokens
 
@@ -56,7 +61,7 @@ Regras de economia adotadas (baseadas em pesquisa, ver PRs):
 1. 1:1 por padrão; grupo só quando a pergunta pede várias especialidades.
 2. Moderador no tier `quick` escolhe quem fala.
 3. Agentes recebem resumo das falas dos colegas, não o texto inteiro.
-4. Agente pode responder "PASSO" se não tiver nada novo.
+4. Agente pode responder "PASSO" se não tiver nada novo; falas internas até 60 palavras.
 5. Estilo caveman entre agentes; síntese para o usuário em linguagem normal.
 6. Skills carregadas só quando usadas; histórico compactado após N mensagens.
 
