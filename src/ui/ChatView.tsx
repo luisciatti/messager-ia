@@ -2,14 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import type { AgentDef } from "../core/agents";
 import { ImagesUnsupportedError } from "../adapters/claude";
 import { BudgetExceededError } from "../core/budget";
-import { directKey, loadConversation, sendDirect, useSaved } from "../core/chat";
-import type { Conversation } from "../core/conversation";
+import { directKey, loadConversation, retryLast, sendDirect, useSaved } from "../core/chat";
+import { visibleFrom, type Conversation } from "../core/conversation";
 import { findFixada, type Fixada } from "../core/memory";
 import { Avatar } from "./Avatar";
 import { Composer } from "./Composer";
+import { IconBroom, IconDoc } from "./icons";
+import { useTopic } from "./useTopic";
 import { MessageList, type Row } from "./MessageList";
 import type { Anexo } from "./prepareImage";
-import type { Services } from "./services";
+import { bloqueioMeta, type Services } from "./services";
+import { votar } from "../core/feedback";
 
 export function ChatView({ services, agent }: { services: Services; agent: AgentDef }) {
   const [conv, setConv] = useState<Conversation | null>(null);
@@ -22,6 +25,15 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [diagrama, setDiagrama] = useState(false);
   const [anexoEnviado, setAnexoEnviado] = useState<Anexo | null>(null);
+  const [mostrarAntigas, setMostrarAntigas] = useState(false);
+  const topico = useTopic(services, directKey(agent.id), agent.id, setConv);
+
+  async function comando(c: "clear" | "doc") {
+    setErro(null);
+    setAviso(c === "clear" ? "Arquivando e limpando…" : "Gerando doc…");
+    setAviso(await topico.executar(c));
+    setMostrarAntigas(false);
+  }
 
   useEffect(() => {
     let vivo = true;
@@ -38,6 +50,11 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
     if ((!t && !anexo) || enviando) return;
     setErro(null);
     setAviso(null);
+    const bloqueio = bloqueioMeta(services);
+    if (bloqueio) {
+      setErro(bloqueio);
+      return;
+    }
     if (!ignorarFixada && !anexo) {
       const f = findFixada((await services.memory.load()).fixadas, agent.id, t);
       if (f) {
@@ -61,7 +78,8 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
       setConv(r.conversa);
       setDiagrama(false);
       if (img) URL.revokeObjectURL(img.previewUrl);
-      if (r.notasUsadas) setAviso(`Usou ${r.notasUsadas} nota(s) da memória.`);
+      const usou = [r.notasUsadas ? `${r.notasUsadas} nota(s)` : "", ...r.docsUsados.map((d) => `doc "${d}"`)].filter(Boolean);
+      if (usou.length) setAviso(`Consultou a memória: ${usou.join(", ")}.`);
     } catch (e) {
       setTexto(t);
       setAnexo(img);
@@ -77,6 +95,26 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
     }
   }
 
+  async function refazer() {
+    if (enviando || !conv) return;
+    setErro(null);
+    setAviso(null);
+    // mostra a pergunta de novo como pendente, sem a resposta antiga
+    setEnviado(conv.mensagens.at(-2)?.content ?? "");
+    setConv({ ...conv, mensagens: conv.mensagens.slice(0, -2) });
+    setParcial("");
+    try {
+      const r = await retryLast(services, agent.id, "default", setParcial);
+      setConv(r.conversa);
+    } catch {
+      setErro("Não consegui refazer agora.");
+      setConv(await loadConversation(services.storage, directKey(agent.id)));
+    } finally {
+      setParcial(null);
+      setEnviado(null);
+    }
+  }
+
   async function usarFixada(f: Fixada) {
     setConv(await useSaved(services, agent.id, texto.trim(), f));
     setTexto("");
@@ -84,9 +122,11 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
     setAviso("Resposta reaproveitada: 0 tokens.");
   }
 
+  const inicio = conv && !mostrarAntigas ? visibleFrom(conv) : 0;
   const rows = useMemo<Row[]>(() => {
     if (!conv) return [];
-    return conv.mensagens.map((m, i) => {
+    return conv.mensagens.slice(inicio).map((m, j) => {
+      const i = j + inicio;
       const deUsuario = m.role === "user";
       const row: Row = {
         key: `${i}-${m.at}`,
@@ -98,7 +138,15 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
         reaproveitada: m.reaproveitada,
         imagemUrl: m.imagem?.url,
         imagemTokens: m.imagem?.tokens,
+        feedback: m.feedback,
+        leve: !deUsuario && m.tier === "quick",
       };
+      if (!deUsuario && !m.reaproveitada) {
+        row.onVoto = async (v) => setConv(await votar(services.storage, directKey(agent.id), conv, i, v));
+      }
+      if (!deUsuario && m.tier === "quick" && i === conv.mensagens.length - 1 && !conv.mensagens[i - 1]?.imagem) {
+        row.onRefazer = () => void refazer();
+      }
       if (!deUsuario && !m.reaproveitada) {
         row.onPin = async () => {
           const pergunta = [...conv.mensagens.slice(0, i)].reverse().find((x) => x.role === "user");
@@ -109,7 +157,7 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
       }
       return row;
     });
-  }, [conv, agent, services]);
+  }, [conv, agent, services, inicio]);
 
   const pendentes: Row[] = enviando
     ? [
@@ -129,10 +177,19 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
           <h1>{agent.nome}</h1>
         </div>
         <p className="canal-desc">{agent.skills.join(" · ")}</p>
+        <div className="canal-acoes">
+          <button onClick={() => void comando("doc")} disabled={topico.ocupado || enviando} title="Cria um doc do assunto atual (/doc)">
+            <IconDoc /> Gerar doc
+          </button>
+          <button onClick={() => void comando("clear")} disabled={topico.ocupado || enviando} title="Limpa a conversa e guarda o que importa na memória (/clear)">
+            <IconBroom /> Limpar
+          </button>
+        </div>
       </header>
 
       <MessageList
         rows={[...rows, ...pendentes]}
+        ocultas={conv ? { n: visibleFrom(conv), mostrando: mostrarAntigas, alternar: () => setMostrarAntigas((v) => !v) } : undefined}
         vazio={
           <>
             <Avatar id={agent.id} label={agent.nome} size={56} />
@@ -160,7 +217,7 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
       <Composer
         valor={texto}
         placeholder={`Mensagem para ${agent.nome}`}
-        desabilitado={enviando}
+        desabilitado={enviando || topico.ocupado}
         anexo={anexo}
         diagrama={diagrama}
         onAnexo={setAnexo}
@@ -170,6 +227,7 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
           setSugestao(null);
         }}
         onEnviar={() => void enviar()}
+        onComando={(c) => void comando(c)}
       />
     </section>
   );

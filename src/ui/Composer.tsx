@@ -2,6 +2,11 @@ import { useRef, useState } from "react";
 import { IconDiagram, IconImage, IconSend } from "./icons";
 import { imageFromClipboard, prepareImage, type Anexo } from "./prepareImage";
 
+const COMANDOS = [
+  { id: "clear" as const, nomes: ["/clear", "/limpar"], desc: "limpa a conversa e guarda o que importa na memória" },
+  { id: "doc" as const, nomes: ["/doc"], desc: "cria um doc do assunto atual (sem limpar)" },
+];
+
 export function Composer(props: {
   valor: string;
   placeholder: string;
@@ -12,8 +17,9 @@ export function Composer(props: {
   onAnexo: (a: Anexo | null) => void;
   onDiagrama: (v: boolean) => void;
   onEnviar: () => void;
+  onComando?: (c: "clear" | "doc") => void;
 }) {
-  const { valor, placeholder, desabilitado, anexo, diagrama, onChange, onAnexo, onDiagrama, onEnviar } = props;
+  const { valor, placeholder, desabilitado, anexo, diagrama, onChange, onAnexo, onDiagrama, onEnviar, onComando } = props;
   const inputRef = useRef<HTMLInputElement>(null);
   const [arrastando, setArrastando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -35,15 +41,43 @@ export function Composer(props: {
 
   // Não envia enquanto a imagem está sendo reduzida (senão sairia sem ela).
   const podeEnviar = !desabilitado && !processando && (!!valor.trim() || !!anexo);
+  const comando = COMANDOS.find((c) => c.nomes.includes(valor.trim().toLowerCase()));
+  const sugerir = onComando && valor.startsWith("/") && !anexo;
+
+  function submeter() {
+    if (comando && onComando) {
+      onChange("");
+      onComando(comando.id);
+      return;
+    }
+    if (podeEnviar) onEnviar();
+  }
 
   return (
     <form
       className="composer"
       onSubmit={(e) => {
         e.preventDefault();
-        if (podeEnviar) onEnviar();
+        submeter();
       }}
     >
+      {sugerir && (
+        <ul className="comandos" role="listbox">
+          {COMANDOS.filter((c) => c.nomes.some((n) => n.startsWith(valor.trim().toLowerCase()))).map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("");
+                  onComando!(c.id);
+                }}
+              >
+                <strong>{c.nomes[0]}</strong> <span>{c.desc}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div
         className={`composer-caixa ${arrastando ? "arrastando" : ""}`}
         onDragOver={(e) => {
@@ -89,7 +123,7 @@ export function Composer(props: {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (podeEnviar) onEnviar();
+              submeter();
             }
           }}
         />
@@ -117,9 +151,9 @@ export function Composer(props: {
                 e.target.value = "";
               }}
             />
-            <small>{erro ?? (processando ? "Preparando imagem…" : "Enter envia · Ctrl+V cola imagem")}</small>
+            <small>{erro ?? (processando ? "Preparando imagem…" : "Enter envia · Ctrl+V cola imagem · / comandos")}</small>
           </div>
-          <button type="submit" className="enviar" disabled={!podeEnviar} aria-label="Enviar">
+          <button type="submit" className="enviar" disabled={!podeEnviar && !comando} aria-label="Enviar">
             <IconSend />
           </button>
         </div>

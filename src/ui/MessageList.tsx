@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "./Avatar";
-import { IconPin } from "./icons";
+import { IconDown, IconPin, IconUp } from "./icons";
 import { Markdown } from "./Markdown";
 import { safeImageUrl } from "../adapters/imageStore";
 
@@ -24,6 +24,10 @@ export interface Row {
   thread?: ThreadItem[];
   imagemUrl?: string;
   imagemTokens?: number;
+  feedback?: 1 | -1;
+  onVoto?: (v: 1 | -1) => void;
+  leve?: boolean;
+  onRefazer?: () => void;
 }
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -66,7 +70,17 @@ function Thread({ itens }: { itens: ThreadItem[] }) {
   );
 }
 
-export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactNode; extra?: ReactNode }) {
+export function MessageList({
+  rows,
+  vazio,
+  extra,
+  ocultas,
+}: {
+  rows: Row[];
+  vazio: ReactNode;
+  extra?: ReactNode;
+  ocultas?: { n: number; mostrando: boolean; alternar: () => void };
+}) {
   const fimRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     fimRef.current?.scrollIntoView({ block: "end" });
@@ -74,11 +88,18 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
 
   return (
     <div className="mensagens" role="log">
+      {ocultas && ocultas.n > 0 && (
+        <div className="ocultas">
+          <button onClick={ocultas.alternar}>
+            {ocultas.mostrando ? "Ocultar mensagens antes do /clear" : `Mostrar ${ocultas.n} mensagens anteriores ao /clear`}
+          </button>
+        </div>
+      )}
       {rows.length === 0 && !extra && <div className="vazio">{vazio}</div>}
       {rows.map((r, i) => {
         const ant = rows[i - 1];
         const novoDia = !ant || dia(ant.at) !== dia(r.at);
-        const compacta = !novoDia && ant && ant.autorId === r.autorId && r.at - ant.at < 5 * 60_000 && !ant.thread;
+        const compacta = !novoDia && ant && ant.autorId === r.autorId && r.at - ant.at < 5 * 60_000 && !ant.thread && !r.onVoto;
         return (
           <div key={r.key}>
             {novoDia && (
@@ -97,6 +118,8 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
                     <time>{hora(r.at)}</time>
                     {r.tokens !== undefined && !r.reaproveitada && <span className="meta">~{r.tokens} tok</span>}
                     {r.reaproveitada && <span className="tag">reaproveitada · 0 tok</span>}
+                    {r.leve && <span className="tag" title="Respondido pelo modelo mais leve (mais rápido)">modelo leve</span>}
+                    {r.feedback && <span className="voto-dado" aria-label={r.feedback === 1 ? "Você aprovou" : "Você reprovou"}>{r.feedback === 1 ? <IconUp /> : <IconDown />}</span>}
                   </header>
                 )}
                 {r.imagemTokens !== undefined && (
@@ -106,12 +129,29 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
                 )}
                 {r.texto && <Markdown texto={r.texto} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}
-              </div>
-              {r.onPin && (
-                <div className="msg-acoes">
-                  <button onClick={r.onPin} title="Fixar resposta na memória" aria-label="Fixar resposta na memória">
-                    <IconPin />
+                {r.onRefazer && (
+                  <button className="refazer" onClick={r.onRefazer} title="Pergunta de novo no modelo padrão (1 chamada a mais)">
+                    Refazer no modelo padrão
                   </button>
+                )}
+              </div>
+              {(r.onPin || r.onVoto) && (
+                <div className="msg-acoes">
+                  {r.onVoto && (
+                    <>
+                      <button className={r.feedback === 1 ? "marcado" : ""} onClick={() => r.onVoto!(1)} title="Boa resposta" aria-label="Boa resposta" aria-pressed={r.feedback === 1}>
+                        <IconUp />
+                      </button>
+                      <button className={r.feedback === -1 ? "marcado" : ""} onClick={() => r.onVoto!(-1)} title="Resposta ruim" aria-label="Resposta ruim" aria-pressed={r.feedback === -1}>
+                        <IconDown />
+                      </button>
+                    </>
+                  )}
+                  {r.onPin && (
+                    <button onClick={r.onPin} title="Fixar resposta na memória" aria-label="Fixar resposta na memória">
+                      <IconPin />
+                    </button>
+                  )}
                 </div>
               )}
             </article>

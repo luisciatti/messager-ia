@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CHARS_PER_TOKEN, type UsageEntry, type UsageTotals } from "../core/tokens";
-import type { Services } from "./services";
+import { loadFeedback, stats, type FeedbackItem } from "../core/feedback";
+import { saveConfig } from "../core/settings";
+import { metaHoje, type Services } from "./services";
 
 type Periodo = "hoje" | "7d";
 const MOTIVOS: Record<string, string> = { resposta: "Respostas", moderacao: "Moderação", sintese: "Síntese", resumo: "Resumos", visao: "Imagens" };
@@ -45,6 +47,77 @@ function Barras({ titulo, linhas }: { titulo: string; linhas: { k: string; rotul
   );
 }
 
+function MetaDiaria({ services }: { services: Services }) {
+  const [meta, setMeta] = useState(String(services.config.metaDiaria));
+  const [pausar, setPausar] = useState(services.config.pausarNaMeta);
+  const [salvo, setSalvo] = useState(false);
+  const m = metaHoje(services);
+
+  async function salvar() {
+    const nova = { metaDiaria: Math.max(1000, Number(meta) || 0), pausarNaMeta: pausar };
+    await saveConfig(services.storage, nova);
+    Object.assign(services.config, nova);
+    setMeta(String(nova.metaDiaria));
+    setSalvo(true);
+    setTimeout(() => setSalvo(false), 1500);
+  }
+
+  return (
+    <div className="cartao">
+      <h3>Meta diária</h3>
+      <div className={`medidor-grande medidor-${m.nivel}`}>
+        <span className="medidor-barra"><span style={{ width: `${Math.min(100, m.pct * 100)}%` }} /></span>
+        <small>~{fmt(m.usado)} de {fmt(m.meta)} tokens hoje ({Math.round(m.pct * 100)}%)</small>
+      </div>
+      <div className="linha meta-form">
+        <label>
+          Meta (tokens/dia){" "}
+          <input type="number" min={1000} step={1000} value={meta} onChange={(e) => setMeta(e.target.value)} />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={pausar} onChange={(e) => setPausar(e.target.checked)} /> Pausar envios ao atingir 100%
+        </label>
+        <button onClick={() => void salvar()}>{salvo ? "Salvo" : "Salvar"}</button>
+      </div>
+      <p className="ajuda">Aviso aos 80%. A pausa não bloqueia o /clear.</p>
+    </div>
+  );
+}
+
+function Qualidade({ services }: { services: Services }) {
+  const [itens, setItens] = useState<FeedbackItem[] | null>(null);
+  useEffect(() => {
+    void loadFeedback(services.storage).then(setItens);
+  }, [services]);
+  if (!itens) return null;
+  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "sintetizador" ? "Síntese" : id);
+  const linhas = (r: Record<string, { up: number; down: number; aprovacao: number | null }>, rot: (k: string) => string) =>
+    Object.entries(r).map(([k, v]) => (
+      <tr key={k}>
+        <td>{rot(k)}</td>
+        <td>{v.up}</td>
+        <td>{v.down}</td>
+        <td>{v.aprovacao === null ? "—" : `${Math.round(v.aprovacao * 100)}%`}</td>
+      </tr>
+    ));
+  return (
+    <div className="cartao">
+      <h3>Qualidade das respostas</h3>
+      {itens.length === 0 ? (
+        <p className="ajuda">Use 👍/👎 nas respostas (passe o mouse sobre elas). Com isso dá para ver se o modelo leve mantém a qualidade.</p>
+      ) : (
+        <table className="tabela">
+          <thead><tr><th>Agente / modelo</th><th>👍</th><th>👎</th><th>Aprovação</th></tr></thead>
+          <tbody>
+            {linhas(stats(itens, (i) => i.agentId), nome)}
+            {linhas(stats(itens, (i) => `tier:${i.tier}`), (k) => (k === "tier:quick" ? "Modelo leve" : k === "tier:default" ? "Modelo padrão" : "Modelo avançado"))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function TokensPanel({ services }: { services: Services }) {
   const [periodo, setPeriodo] = useState<Periodo>("hoje");
   const [versao, setVersao] = useState(0);
@@ -56,7 +129,8 @@ export function TokensPanel({ services }: { services: Services }) {
     return services.log.entries().filter((e) => e.at >= inicio);
   }, [services, periodo, versao]);
 
-  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "visao" ? "Visão (imagens)" : id);
+  const nome = (id: string) =>
+    services.agents.get(id)?.nome ?? ({ visao: "Visão (imagens)", memoria: "Memória (/clear)" } as Record<string, string>)[id] ?? id;
   const total = soma(lista);
   const falhas = lista.filter((e) => e.failed).length;
 
@@ -84,6 +158,8 @@ export function TokensPanel({ services }: { services: Services }) {
         <div><strong>{total.calls}</strong><small>chamadas{falhas ? ` · ${falhas} falha(s)` : ""}</small></div>
       </div>
 
+      <MetaDiaria services={services} />
+      <Qualidade services={services} />
       <p className="legenda"><span className="barra-in" /> entrada <span className="barra-out" /> saída</p>
       <Barras titulo="Por agente" linhas={agrupar(lista, (e) => e.agentId).map((l) => ({ ...l, rotulo: nome(l.k) }))} />
       <Barras titulo="Por motivo" linhas={agrupar(lista, (e) => e.reason).map((l) => ({ ...l, rotulo: MOTIVOS[l.k] ?? l.k }))} />

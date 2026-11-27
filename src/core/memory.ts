@@ -33,11 +33,27 @@ export interface Fixada {
   criadaEm: number;
 }
 
+/** Doc: síntese curta de um assunto RESOLVIDO (problema → solução → cuidados). */
+export interface Doc {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  tags: string[];
+  agentId: string;
+  criadaEm: number;
+  atualizadoEm: number;
+}
+
 export interface Memoria {
   nucleo: string[];
   notas: Nota[];
   fixadas: Fixada[];
+  docs: Doc[];
 }
+
+export const DOCS_MAX = 100;
+export const DOCS_MAX_TOKENS = 250;
+export const SIMILAR_DOC = 0.6;
 
 const STOP = new Set(
   "a o e de da do das dos em no na nos nas um uma para por com sem que se os as ao aos como mais mas ou eu voce meu minha isso esse essa este esta ser ter tem sao foi qual quais quando onde porque pra pro fazer faco faz posso pode devo deve preciso quero consigo the and of to in is".split(" "),
@@ -87,6 +103,23 @@ export function searchNotes(notas: Nota[], query: string, maxTokens = NOTAS_MAX_
   return out;
 }
 
+/** Mesma busca local das notas, sobre título + tags + conteúdo. Por padrão só o melhor doc. */
+export function searchDocs(docs: Doc[], query: string, maxTokens = DOCS_MAX_TOKENS, max = 1): Doc[] {
+  const comoNotas = docs.map((d) => ({ id: d.id, agentId: d.agentId, criadaEm: d.atualizadoEm, texto: `${d.titulo} ${d.tags.join(" ")} ${d.conteudo}` }));
+  const achados = searchNotes(comoNotas, query, Number.MAX_SAFE_INTEGER, docs.length);
+  const out: Doc[] = [];
+  let used = 0;
+  for (const a of achados) {
+    const d = docs.find((x) => x.id === a.id)!;
+    const t = estimateTokens(`${d.titulo}\n${d.conteudo}`);
+    if (out.length >= max) break;
+    if (used + t > maxTokens) continue;
+    out.push(d);
+    used += t;
+  }
+  return out;
+}
+
 export function findFixada(fixadas: Fixada[], agentId: string, pergunta: string): Fixada | null {
   const q = terms(pergunta);
   let best: { f: Fixada; s: number } | null = null;
@@ -105,10 +138,13 @@ export function nucleoTokens(nucleo: string[]): number {
 const fmtData = (ms: number) => new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
 /** Bloco que vai no system prompt. Vazio se não houver nada. */
-export function memoryBlock(nucleo: string[], notas: Nota[]): string {
+export function memoryBlock(nucleo: string[], notas: Nota[], docs: Doc[] = []): string {
   const parts: string[] = [];
   if (nucleo.length) parts.push(`Ambiente do usuário:\n${nucleo.map((f) => `- ${f}`).join("\n")}`);
   if (notas.length) parts.push(`Notas de conversas anteriores (podem estar desatualizadas):\n${notas.map((n) => `- (${fmtData(n.criadaEm)}) ${n.texto}`).join("\n")}`);
+  if (docs.length) {
+    parts.push(`Doc da base do usuário (cite pelo título se usar):\n${docs.map((d) => `[${d.titulo}]\n${d.conteudo}`).join("\n\n")}`);
+  }
   return parts.length ? `<memoria>\n${parts.join("\n")}\n</memoria>` : "";
 }
 
@@ -125,18 +161,30 @@ export function mergeNotas(atuais: Nota[], novas: Omit<Nota, "id">[]): Nota[] {
   return list.sort((a, b) => a.criadaEm - b.criadaEm).slice(-NOTAS_MAX);
 }
 
-const KEYS = { nucleo: "memoria-nucleo", notas: "memoria-notas", fixadas: "memoria-fixadas" } as const;
+/** Acrescenta ou atualiza (título parecido = mesmo assunto) e limita o total. */
+export function mergeDoc(atuais: Doc[], novo: Omit<Doc, "id" | "atualizadoEm">): { docs: Doc[]; doc: Doc } {
+  const t = terms(novo.titulo);
+  const igual = atuais.find((d) => jaccard(t, terms(d.titulo)) >= SIMILAR_DOC);
+  const doc: Doc = igual
+    ? { ...igual, ...novo, id: igual.id, criadaEm: igual.criadaEm, atualizadoEm: novo.criadaEm }
+    : { ...novo, id: `${novo.criadaEm}-${Math.random().toString(36).slice(2, 8)}`, atualizadoEm: novo.criadaEm };
+  const docs = [...atuais.filter((d) => d.id !== doc.id), doc].sort((a, b) => a.atualizadoEm - b.atualizadoEm).slice(-DOCS_MAX);
+  return { docs, doc };
+}
+
+const KEYS = { nucleo: "memoria-nucleo", notas: "memoria-notas", fixadas: "memoria-fixadas", docs: "memoria-docs" } as const;
 
 export class MemoryStore {
   constructor(private storage: Storage) {}
 
   async load(): Promise<Memoria> {
-    const [n, no, f] = await Promise.all([
+    const [n, no, f, d] = await Promise.all([
       this.storage.get<{ fatos: string[] }>(KEYS.nucleo),
       this.storage.get<{ itens: Nota[] }>(KEYS.notas),
       this.storage.get<{ itens: Fixada[] }>(KEYS.fixadas),
+      this.storage.get<{ itens: Doc[] }>(KEYS.docs),
     ]);
-    return { nucleo: n?.fatos ?? [], notas: no?.itens ?? [], fixadas: f?.itens ?? [] };
+    return { nucleo: n?.fatos ?? [], notas: no?.itens ?? [], fixadas: f?.itens ?? [], docs: d?.itens ?? [] };
   }
 
   async saveNucleo(fatos: string[]): Promise<void> {
@@ -158,6 +206,18 @@ export class MemoryStore {
   async removeNota(id: string): Promise<void> {
     const { notas } = await this.load();
     await this.storage.set(KEYS.notas, { itens: notas.filter((n) => n.id !== id) });
+  }
+
+  async addDoc(novo: Omit<Doc, "id" | "atualizadoEm">): Promise<Doc> {
+    const { docs } = await this.load();
+    const r = mergeDoc(docs, novo);
+    await this.storage.set(KEYS.docs, { itens: r.docs });
+    return r.doc;
+  }
+
+  async removeDoc(id: string): Promise<void> {
+    const { docs } = await this.load();
+    await this.storage.set(KEYS.docs, { itens: docs.filter((d) => d.id !== id) });
   }
 
   async fixar(f: Omit<Fixada, "id">): Promise<void> {

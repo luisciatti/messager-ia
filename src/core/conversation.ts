@@ -7,7 +7,7 @@
  * (todas menos as KEEP_LAST últimas) viram resumo numa chamada "quick".
  */
 
-import type { AskRequest, ChatMessage } from "../adapters/claude";
+import type { AskRequest, ChatMessage, ModelTier } from "../adapters/claude";
 import type { ImagemSalva } from "./images";
 
 export const KEEP_LAST = 6;
@@ -27,6 +27,10 @@ export interface StoredMessage {
   reaproveitada?: boolean;
   /** Imagem enviada pelo usuário. No histórico vira só um marcador de texto. */
   imagem?: ImagemSalva;
+  /** Tier do modelo que gerou a resposta (para qualidade e roteamento). */
+  tier?: ModelTier;
+  /** 👍 (1) ou 👎 (-1) do usuário. */
+  feedback?: 1 | -1;
   /** Fala individual de agente no grupo: exibida, mas fora do contexto (a síntese já a cobre). */
   interna?: boolean;
 }
@@ -37,6 +41,8 @@ export interface Conversation {
   mensagens: StoredMessage[];
   /** Mensagens com índice < compactadoAte já estão no resumo. */
   compactadoAte: number;
+  /** /clear: mensagens com índice < limpoAte ficam ocultas e fora do contexto. */
+  limpoAte?: number;
   atualizadoEm: number;
 }
 
@@ -144,5 +150,17 @@ export function appendMessages(conv: Conversation, ...novas: StoredMessage[]): C
     mensagens = mensagens.slice(excesso);
     compactadoAte = Math.max(0, compactadoAte - excesso);
   }
-  return { ...conv, mensagens, compactadoAte, atualizadoEm: Date.now() };
+  const limpoAte = conv.limpoAte ? Math.max(0, conv.limpoAte - Math.max(0, excesso)) : conv.limpoAte;
+  return { ...conv, mensagens, compactadoAte, limpoAte, atualizadoEm: Date.now() };
+}
+
+/** Mensagens desde o último /clear (as que a tela mostra por padrão). */
+export function visibleFrom(conv: Conversation): number {
+  return conv.limpoAte ?? 0;
+}
+
+/** Zera o contexto: nada antes daqui volta para o Claude; o que importa foi para a memória. */
+export function clearConversation(conv: Conversation): Conversation {
+  const n = conv.mensagens.length;
+  return { ...conv, resumo: "", compactadoAte: n, limpoAte: n, atualizadoEm: Date.now() };
 }

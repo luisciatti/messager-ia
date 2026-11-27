@@ -17,7 +17,9 @@ import {
   type Conversation,
 } from "./conversation";
 import type { ImagemEnvio } from "./images";
-import { memoryBlock, searchNotes, type Fixada, type MemoryStore } from "./memory";
+import { routeTier } from "./routing";
+import type { ModelTier } from "../adapters/claude";
+import { memoryBlock, searchDocs, searchNotes, type Fixada, type MemoryStore } from "./memory";
 import type { MeteredClient } from "./metered";
 import { estimateTokens } from "./tokens";
 
@@ -38,8 +40,9 @@ export async function loadConversation(storage: Storage, key: string): Promise<C
 export async function systemWithMemory(deps: ChatDeps, base: string, query: string) {
   const mem = await deps.memory.load();
   const notas = searchNotes(mem.notas, query);
-  const bloco = memoryBlock(mem.nucleo, notas);
-  return { system: bloco ? `${base}\n${bloco}` : base, notasUsadas: notas.length };
+  const docs = searchDocs(mem.docs, query);
+  const bloco = memoryBlock(mem.nucleo, notas, docs);
+  return { system: bloco ? `${base}\n${bloco}` : base, notasUsadas: notas.length, docsUsados: docs.map((d) => d.titulo) };
 }
 
 /** Compacta se precisar; extrai notas na mesma chamada. Falha não derruba a conversa. */
@@ -69,12 +72,15 @@ export interface SendResult {
   resposta: string;
   compactou: boolean;
   notasUsadas: number;
+  docsUsados: string[];
 }
 
 export interface SendOptions {
   imagem?: ImagemEnvio;
   /** Pede um diagrama Mermaid na resposta (só quando o usuário liga). */
   diagrama?: boolean;
+  /** Ignora o roteamento (ex.: "refazer no modelo padrão"). */
+  forcarTier?: ModelTier;
 }
 
 export async function sendDirect(
@@ -91,14 +97,15 @@ export async function sendDirect(
   let conv = await loadConversation(deps.storage, key);
   const budget = new BudgetTracker(DIRECT_BUDGET);
   const base = buildSystemPrompt(agent, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : "");
-  const { system, notasUsadas } = await systemWithMemory(deps, base, texto);
+  const { system, notasUsadas, docsUsados } = await systemWithMemory(deps, base, texto);
   const pergunta = texto || (opts.imagem ? IMAGE_ONLY_TEXT : "");
+  const tier = opts.forcarTier ?? routeTier(texto, agent.tier, { imagem: !!opts.imagem, diagrama: opts.diagrama });
 
   const res = await deps.metered.ask(
     {
       system,
       messages: buildContext(conv, pergunta),
-      modelTier: agent.tier,
+      modelTier: tier,
       onText,
       images: opts.imagem ? [opts.imagem.blob] : undefined,
       imageTokens: opts.imagem?.tokens,
@@ -116,12 +123,12 @@ export async function sendDirect(
       at: now,
       imagem: opts.imagem ? { url: opts.imagem.url, tokens: opts.imagem.tokens } : undefined,
     },
-    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text) },
+    { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text), tier },
   );
 
   const c = await maybeCompact(deps, conv, agentId, budget);
   await deps.storage.set(key, c.conv);
-  return { conversa: c.conv, resposta: res.text, compactou: c.compactou, notasUsadas };
+  return { conversa: c.conv, resposta: res.text, compactou: c.compactou, notasUsadas, docsUsados };
 }
 
 /** Reaproveita uma resposta fixada: nenhuma chamada ao Claude. */
@@ -135,4 +142,22 @@ export async function useSaved(deps: ChatDeps, agentId: string, texto: string, f
   );
   await deps.storage.set(key, conv);
   return conv;
+}
+
+/** Desfaz a última troca (pergunta + resposta) e pergunta de novo no tier pedido. */
+export async function retryLast(
+  deps: ChatDeps,
+  agentId: string,
+  tier: ModelTier,
+  onText?: (t: string) => void,
+): Promise<SendResult> {
+  const key = directKey(agentId);
+  const conv = await loadConversation(deps.storage, key);
+  const n = conv.mensagens.length;
+  const pergunta = conv.mensagens[n - 2];
+  if (n < 2 || pergunta.role !== "user" || conv.mensagens[n - 1].role !== "assistant" || pergunta.imagem) {
+    throw new Error("nada para refazer");
+  }
+  await deps.storage.set(key, { ...conv, mensagens: conv.mensagens.slice(0, -2), compactadoAte: Math.min(conv.compactadoAte, n - 2) });
+  return sendDirect(deps, agentId, pergunta.content, onText, { forcarTier: tier });
 }
