@@ -15,7 +15,7 @@ export interface CallMeta {
 }
 
 export function estimateRequestTokens(req: AskRequest): number {
-  return buildInput(req).reduce((sum, m) => sum + estimateTokens(m.content), 0);
+  return buildInput(req).reduce((sum, m) => sum + estimateTokens(m.content), 0) + (req.imageTokens ?? 0);
 }
 
 export interface MeteredClient {

@@ -13,6 +13,9 @@ export const DIRECT_BUDGET: Budget = { maxCalls: 2, maxTokens: 6000 };
 /** Grupo → moderador + 2-3 agentes + síntese. */
 export const GROUP_BUDGET: Budget = { maxCalls: 5, maxTokens: 8000 };
 
+/** Grupo com imagem: +1 chamada para descrever a imagem uma vez só. */
+export const GROUP_IMAGE_BUDGET: Budget = { maxCalls: 6, maxTokens: 10000 };
+
 /** Manutenção (compactação) do grupo: fora do orçamento da resposta. */
 export const COMPACTION_BUDGET: Budget = { maxCalls: 1, maxTokens: 4000 };
 

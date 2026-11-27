@@ -36,6 +36,13 @@ export const STYLE_RULES: Record<AgentStyle, string> = {
 export const USER_STYLE =
   "Para o usuário: até ~120 palavras. Pergunta ampla ou sem contexto: explique o essencial em 2-4 frases e faça 1 pergunta sobre o caso dele. Aprofunde só se pedir. Markdown leve: no máximo 1 lista curta, sem títulos.";
 
+/** Só quando o usuário pede um diagrama (Mermaid é texto curto; o navegador desenha). */
+export const DIAGRAM_RULE =
+  "Inclua 1 diagrama Mermaid curto (bloco ```mermaid, até 15 linhas) que ilustre a resposta.";
+
+/** Imagem sem texto: entender e perguntar, sem palestra. */
+export const IMAGE_ONLY_TEXT = "[Imagem enviada sem texto. Diga em 1-2 frases o que é relevante nela e pergunte o que o usuário quer.]";
+
 /** Formato no grupo: curto e com saída para "nada a acrescentar" (S²-MAD). */
 export const GROUP_RULE =
   "No grupo: até 5 linhas (posição, motivo, risco). Se nada novo a acrescentar, responda só PASSO.";

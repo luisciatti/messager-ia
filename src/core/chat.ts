@@ -4,7 +4,7 @@
  */
 
 import type { Storage } from "../adapters/storage";
-import { buildSystemPrompt, type AgentDef } from "./agents";
+import { buildSystemPrompt, DIAGRAM_RULE, IMAGE_ONLY_TEXT, type AgentDef } from "./agents";
 import { BudgetExceededError, BudgetTracker, DIRECT_BUDGET } from "./budget";
 import {
   appendMessages,
@@ -16,6 +16,7 @@ import {
   parseCompaction,
   type Conversation,
 } from "./conversation";
+import type { ImagemEnvio } from "./images";
 import { memoryBlock, searchNotes, type Fixada, type MemoryStore } from "./memory";
 import type { MeteredClient } from "./metered";
 import { estimateTokens } from "./tokens";
@@ -70,11 +71,18 @@ export interface SendResult {
   notasUsadas: number;
 }
 
+export interface SendOptions {
+  imagem?: ImagemEnvio;
+  /** Pede um diagrama Mermaid na resposta (só quando o usuário liga). */
+  diagrama?: boolean;
+}
+
 export async function sendDirect(
   deps: ChatDeps,
   agentId: string,
   texto: string,
   onText?: (t: string) => void,
+  opts: SendOptions = {},
 ): Promise<SendResult> {
   const agent = deps.agents.get(agentId);
   if (!agent) throw new Error(`agente desconhecido: ${agentId}`);
@@ -82,10 +90,19 @@ export async function sendDirect(
   const key = directKey(agentId);
   let conv = await loadConversation(deps.storage, key);
   const budget = new BudgetTracker(DIRECT_BUDGET);
-  const { system, notasUsadas } = await systemWithMemory(deps, buildSystemPrompt(agent, "direto"), texto);
+  const base = buildSystemPrompt(agent, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : "");
+  const { system, notasUsadas } = await systemWithMemory(deps, base, texto);
+  const pergunta = texto || (opts.imagem ? IMAGE_ONLY_TEXT : "");
 
   const res = await deps.metered.ask(
-    { system, messages: buildContext(conv, texto), modelTier: agent.tier, onText },
+    {
+      system,
+      messages: buildContext(conv, pergunta),
+      modelTier: agent.tier,
+      onText,
+      images: opts.imagem ? [opts.imagem.blob] : undefined,
+      imageTokens: opts.imagem?.tokens,
+    },
     { agentId, reason: "resposta" },
     budget,
   );
@@ -93,7 +110,12 @@ export async function sendDirect(
   const now = Date.now();
   conv = appendMessages(
     conv,
-    { role: "user", content: texto, at: now },
+    {
+      role: "user",
+      content: texto,
+      at: now,
+      imagem: opts.imagem ? { url: opts.imagem.url, tokens: opts.imagem.tokens } : undefined,
+    },
     { role: "assistant", content: res.text, at: now, agentId, tokens: estimateTokens(res.text) },
   );
 
