@@ -14,7 +14,7 @@ import { groupKey, isPass, SYNTH_ID, type GroupDeps } from "./group";
 import { estimateTokens } from "./tokens";
 
 export const REPLICA_RULE =
-  "Revise a resposta final abaixo na sua área. Correta e completa: responda só PASSO. Senão, aponte em até 3 linhas o erro ou o que falta.";
+  "Revise a resposta final abaixo na sua área. Correta e completa: responda só PASSO. Senão, aponte em até 40 palavras o erro ou o que falta.";
 export const REVISAO_RULE = "Revise a resposta anterior considerando as objeções. Mantenha o que está certo e corrija o resto.";
 
 export interface ReplicaResult {
