@@ -15,7 +15,10 @@ import type { Doc } from "./memory";
 import { estimateTokens } from "./tokens";
 
 /** Teto do trecho enviado no fechamento (mantém o fim, que é onde está a conclusão). */
-export const CLOSING_MAX_TOKENS = 2500;
+export const CLOSING_MAX_TOKENS = 1500;
+/** Respostas antigas do agente entram encurtadas; as últimas, inteiras (é onde costuma estar a solução). */
+export const CLOSING_FULL_LAST = 2;
+export const CLOSING_OLD_REPLY_CHARS = 300;
 export const CLOSING_AGENT_ID = "memoria";
 export const CLOSING_MIN_TOKENS = 10;
 
@@ -29,11 +32,22 @@ const DOC_FORCADO = "doc: obrigatório, sintetizando o assunto.";
 const FORMATO =
   'Formato do doc: título curto; conteúdo em markdown até 120 palavras (problema, solução ou passos, cuidados); até 4 tags. Responda só JSON: {"notas":["..."],"doc":{"titulo":"...","conteudo":"...","tags":["..."]} ou null}';
 
+/**
+ * Trecho do fechamento, sem duplicar: o que já foi compactado entra só pelo
+ * resumo; depois vêm as mensagens ainda não resumidas.
+ */
 export function closingTranscript(conv: Conversation): string {
-  const linhas = conv.mensagens
-    .slice(visibleFrom(conv))
-    .filter((m) => !m.interna)
-    .map((m) => `${m.role === "user" ? "U" : "A"}: ${m.imagem ? "[imagem] " : ""}${m.content}`);
+  const inicio = Math.max(visibleFrom(conv), conv.compactadoAte);
+  const msgs = conv.mensagens.slice(inicio).filter((m) => !m.interna);
+  const respostas = msgs.map((m, i) => (m.role === "assistant" ? i : -1)).filter((i) => i >= 0);
+  const inteiras = new Set(respostas.slice(-CLOSING_FULL_LAST));
+  const linhas = msgs.map((m, i) => {
+    let texto = m.content;
+    if (m.role === "assistant" && !inteiras.has(i) && texto.length > CLOSING_OLD_REPLY_CHARS) {
+      texto = `${texto.slice(0, CLOSING_OLD_REPLY_CHARS)}…`;
+    }
+    return `${m.role === "user" ? "U" : "A"}: ${m.imagem ? "[imagem] " : ""}${texto}`;
+  });
   let texto = linhas.join("\n");
   const maxChars = CLOSING_MAX_TOKENS * 3.5;
   if (texto.length > maxChars) texto = `[…início omitido]\n${texto.slice(-maxChars)}`;

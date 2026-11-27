@@ -3,7 +3,7 @@ import type { AskRequest, ClaudeClient } from "../src/adapters/claude";
 import { createMemoryStorage } from "../src/adapters/storage";
 import { directKey, loadConversation, sendDirect } from "../src/core/chat";
 import { closeTopic, closingTranscript, parseClosing } from "../src/core/closing";
-import { appendMessages, emptyConversation, visibleFrom } from "../src/core/conversation";
+import { appendMessages, applyCompaction, emptyConversation, visibleFrom, type Conversation } from "../src/core/conversation";
 import { MemoryStore, mergeDoc } from "../src/core/memory";
 import { createMeteredClient } from "../src/core/metered";
 import { agents } from "../src/core/registry";
@@ -46,8 +46,27 @@ describe("closingTranscript", () => {
   it("corta o início quando o trecho é grande, mantendo o fim", () => {
     const conv = appendMessages(emptyConversation("c"), { role: "user", content: "x".repeat(20000), at: 0 }, { role: "assistant", content: "FIM", at: 1 });
     const t = closingTranscript(conv);
-    expect(t.length).toBeLessThan(9500);
+    expect(t.length).toBeLessThan(1500 * 3.5 + 100);
     expect(t).toContain("FIM");
+  });
+
+  it("não duplica: o que foi compactado entra só pelo resumo", () => {
+    let c: Conversation = emptyConversation("c");
+    for (let i = 0; i < 8; i++) c = appendMessages(c, { role: "user", content: `PERGUNTA_${i}`, at: i }, { role: "assistant", content: `RESPOSTA_${i}`, at: i });
+    c = applyCompaction(c, "RESUMO");
+    const t = closingTranscript(c);
+    expect(t).toContain("RESUMO");
+    expect(t).not.toContain("PERGUNTA_0");
+    expect(t).toContain("PERGUNTA_7");
+  });
+
+  it("encurta respostas antigas e mantém as 2 últimas inteiras", () => {
+    let c: Conversation = emptyConversation("c");
+    for (let i = 0; i < 3; i++) c = appendMessages(c, { role: "user", content: `p${i}`, at: i }, { role: "assistant", content: `R${i}` + "x".repeat(800), at: i });
+    const t = closingTranscript(c);
+    expect(t).toContain("R0" + "x".repeat(298) + "…");
+    expect(t).toContain("R2" + "x".repeat(800));
+    expect(t).toContain("R1" + "x".repeat(800));
   });
 });
 
