@@ -17,7 +17,7 @@ import {
   type Conversation,
 } from "./conversation";
 import type { ImagemEnvio } from "./images";
-import { memoryBlock, searchNotes, type Fixada, type MemoryStore } from "./memory";
+import { memoryBlock, searchDocs, searchNotes, type Fixada, type MemoryStore } from "./memory";
 import type { MeteredClient } from "./metered";
 import { estimateTokens } from "./tokens";
 
@@ -38,8 +38,9 @@ export async function loadConversation(storage: Storage, key: string): Promise<C
 export async function systemWithMemory(deps: ChatDeps, base: string, query: string) {
   const mem = await deps.memory.load();
   const notas = searchNotes(mem.notas, query);
-  const bloco = memoryBlock(mem.nucleo, notas);
-  return { system: bloco ? `${base}\n${bloco}` : base, notasUsadas: notas.length };
+  const docs = searchDocs(mem.docs, query);
+  const bloco = memoryBlock(mem.nucleo, notas, docs);
+  return { system: bloco ? `${base}\n${bloco}` : base, notasUsadas: notas.length, docsUsados: docs.map((d) => d.titulo) };
 }
 
 /** Compacta se precisar; extrai notas na mesma chamada. Falha não derruba a conversa. */
@@ -69,6 +70,7 @@ export interface SendResult {
   resposta: string;
   compactou: boolean;
   notasUsadas: number;
+  docsUsados: string[];
 }
 
 export interface SendOptions {
@@ -91,7 +93,7 @@ export async function sendDirect(
   let conv = await loadConversation(deps.storage, key);
   const budget = new BudgetTracker(DIRECT_BUDGET);
   const base = buildSystemPrompt(agent, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : "");
-  const { system, notasUsadas } = await systemWithMemory(deps, base, texto);
+  const { system, notasUsadas, docsUsados } = await systemWithMemory(deps, base, texto);
   const pergunta = texto || (opts.imagem ? IMAGE_ONLY_TEXT : "");
 
   const res = await deps.metered.ask(
@@ -121,7 +123,7 @@ export async function sendDirect(
 
   const c = await maybeCompact(deps, conv, agentId, budget);
   await deps.storage.set(key, c.conv);
-  return { conversa: c.conv, resposta: res.text, compactou: c.compactou, notasUsadas };
+  return { conversa: c.conv, resposta: res.text, compactou: c.compactou, notasUsadas, docsUsados };
 }
 
 /** Reaproveita uma resposta fixada: nenhuma chamada ao Claude. */

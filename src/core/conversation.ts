@@ -37,6 +37,8 @@ export interface Conversation {
   mensagens: StoredMessage[];
   /** Mensagens com índice < compactadoAte já estão no resumo. */
   compactadoAte: number;
+  /** /clear: mensagens com índice < limpoAte ficam ocultas e fora do contexto. */
+  limpoAte?: number;
   atualizadoEm: number;
 }
 
@@ -144,5 +146,17 @@ export function appendMessages(conv: Conversation, ...novas: StoredMessage[]): C
     mensagens = mensagens.slice(excesso);
     compactadoAte = Math.max(0, compactadoAte - excesso);
   }
-  return { ...conv, mensagens, compactadoAte, atualizadoEm: Date.now() };
+  const limpoAte = conv.limpoAte ? Math.max(0, conv.limpoAte - Math.max(0, excesso)) : conv.limpoAte;
+  return { ...conv, mensagens, compactadoAte, limpoAte, atualizadoEm: Date.now() };
+}
+
+/** Mensagens desde o último /clear (as que a tela mostra por padrão). */
+export function visibleFrom(conv: Conversation): number {
+  return conv.limpoAte ?? 0;
+}
+
+/** Zera o contexto: nada antes daqui volta para o Claude; o que importa foi para a memória. */
+export function clearConversation(conv: Conversation): Conversation {
+  const n = conv.mensagens.length;
+  return { ...conv, resumo: "", compactadoAte: n, limpoAte: n, atualizadoEm: Date.now() };
 }
