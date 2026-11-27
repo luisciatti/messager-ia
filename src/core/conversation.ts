@@ -35,6 +35,8 @@ export interface StoredMessage {
   replica?: boolean;
   /** Fala individual de agente no grupo: exibida, mas fora do contexto (a síntese já a cobre). */
   interna?: boolean;
+  /** Resposta revisada com fontes da web (só metadados; os trechos não ficam salvos). */
+  fontes?: { url: string; titulo: string; data?: string }[];
 }
 
 export interface Conversation {

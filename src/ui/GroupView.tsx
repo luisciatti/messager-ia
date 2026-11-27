@@ -14,6 +14,9 @@ import { MessageList, type Row, type ThreadItem } from "./MessageList";
 import type { Anexo } from "./prepareImage";
 import { bloqueioMeta, type Services } from "./services";
 import { votar } from "../core/feedback";
+import { precisaFontes, SemFontesError, ultimaResposta, verificarNaWeb } from "../core/fontes";
+import { useWeb } from "./useWeb";
+import { WebSearchError } from "../adapters/webSearch";
 
 interface Progresso {
   falantes?: string[];
@@ -53,6 +56,24 @@ export function GroupView({ services, group }: { services: Services; group: Grou
     } catch (e) {
       setAviso(null);
       setErro(e instanceof BudgetExceededError ? e.message : "Não consegui pedir a réplica agora.");
+    } finally {
+      setRevisando(false);
+    }
+  }
+
+  const webOk = useWeb(services);
+  async function verificar() {
+    if (prog || revisando || !services.web) return;
+    setErro(null);
+    setAviso("Buscando fontes na web…");
+    setRevisando(true);
+    try {
+      const r = await verificarNaWeb({ ...services, web: services.web }, groupKey(group.id), group.id);
+      setConv(r.conversa);
+      setAviso(`Resposta revisada com ${r.fontes.length} fonte(s).`);
+    } catch (e) {
+      setAviso(null);
+      setErro(e instanceof BudgetExceededError || e instanceof SemFontesError || e instanceof WebSearchError ? e.message : "Não consegui verificar agora.");
     } finally {
       setRevisando(false);
     }
@@ -148,15 +169,23 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         imagemTokens: m.imagem?.tokens,
         feedback: m.feedback,
         leve: !deUsuario && m.tier === "quick",
+        fontes: m.fontes,
         onVoto: deUsuario ? undefined : async (v) => setConv(await votar(services.storage, groupKey(group.id), conv, i, v)),
       });
       pend = [];
     });
     // "Pedir réplica" só na última resposta final.
     const ultima = out.at(-1);
-    if (ultima && ultima.autorId !== "voce") ultima.onReplica = () => void replica();
+    if (ultima && ultima.autorId !== "voce") {
+      ultima.onReplica = () => void replica();
+      const alvo = ultimaResposta(conv);
+      if (webOk && !revisando && alvo && !conv.mensagens[alvo.iResposta].fontes) {
+        ultima.onVerificar = () => void verificar();
+        ultima.verificarDestaque = precisaFontes(conv.mensagens[alvo.iPergunta].content);
+      }
+    }
     return out;
-  }, [conv, services, inicio]);
+  }, [conv, services, inicio, webOk, revisando]);
 
   const status = prog
     ? prog.falantes

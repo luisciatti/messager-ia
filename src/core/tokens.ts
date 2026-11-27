@@ -16,7 +16,7 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN);
 }
 
-export type UsageReason = "resposta" | "moderacao" | "sintese" | "resumo" | "visao";
+export type UsageReason = "resposta" | "moderacao" | "sintese" | "resumo" | "visao" | "fontes";
 
 export interface UsageEntry {
   id: number;

@@ -45,7 +45,7 @@ export const IMAGE_ONLY_TEXT = "[Imagem enviada sem texto. Diga em 1-2 frases o 
 
 /** Formato no grupo: curto e com saída para "nada a acrescentar" (S²-MAD). */
 export const GROUP_RULE =
-  "No grupo: até 5 linhas (posição, motivo, risco). Se nada novo a acrescentar, responda só PASSO.";
+  "No grupo: até 60 palavras (posição, motivo, risco). Nada novo a acrescentar: responda só PASSO.";
 
 const TIERS: ModelTier[] = ["quick", "default", "complex"];
 const ROLES: AgentRole[] = ["especialista", "moderador", "sintese"];

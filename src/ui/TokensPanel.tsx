@@ -5,7 +5,7 @@ import { saveConfig } from "../core/settings";
 import { metaHoje, type Services } from "./services";
 
 type Periodo = "hoje" | "7d";
-const MOTIVOS: Record<string, string> = { resposta: "Respostas", moderacao: "Moderação", sintese: "Síntese", resumo: "Resumos", visao: "Imagens" };
+const MOTIVOS: Record<string, string> = { resposta: "Respostas", moderacao: "Moderação", sintese: "Síntese", resumo: "Resumos", visao: "Imagens", fontes: "Fontes (web)" };
 
 function soma(list: readonly UsageEntry[]): UsageTotals {
   const t = { calls: list.length, inTokens: 0, outTokens: 0, total: 0 };

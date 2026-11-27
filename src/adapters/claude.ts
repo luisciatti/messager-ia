@@ -130,6 +130,9 @@ export function mockReply(req: AskRequest): string {
   if (req.system.includes("Revise a resposta final")) {
     return req.system.includes("operação na OCI") ? "(simulado) Falta citar o Free Tier da OCI." : "PASSO";
   }
+  if (req.system.includes("fontes abaixo")) {
+    return "(simulado) Resposta revisada com as fontes: ponto confirmado [1]; detalhe atualizado [2].";
+  }
   if (req.system.includes("Una as falas")) {
     const nomes = [...last.matchAll(/^\[([^\]]+)\]:/gm)].map((m) => m[1]);
     return `(simulado) Síntese das falas de ${nomes.join(", ")}. No artifact, o Claude une as posições de verdade.`;
