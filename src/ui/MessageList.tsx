@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "./Avatar";
 import { IconPin } from "./icons";
+import { Markdown } from "./Markdown";
 
 export interface ThreadItem {
   autorId: string;
@@ -52,7 +53,7 @@ function Thread({ itens }: { itens: ThreadItem[] }) {
               <Avatar id={i.autorId} label={i.autorNome} size={24} />
               <div>
                 <span className="autor">{i.autorNome}</span>
-                <p>{i.texto}</p>
+                <Markdown texto={i.texto} />
               </div>
             </div>
           ))}
@@ -95,7 +96,7 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
                     {r.reaproveitada && <span className="tag">reaproveitada · 0 tok</span>}
                   </header>
                 )}
-                <p>{r.texto}</p>
+                {r.texto && <Markdown texto={r.texto} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}
               </div>
               {r.onPin && (
