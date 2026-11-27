@@ -18,3 +18,9 @@ export const IconSend = () => (
 export const IconMenu = () => (
   <svg {...base}><path d="M2.5 4h11M2.5 8h11M2.5 12h11" /></svg>
 );
+export const IconImage = () => (
+  <svg {...base}><rect x="2" y="3" width="12" height="10" rx="1.5" /><circle cx="6" cy="6.5" r="1.2" /><path d="m2.5 12 3.5-3.5 2.5 2.5 2-2 3 3" /></svg>
+);
+export const IconDiagram = () => (
+  <svg {...base}><rect x="1.5" y="2.5" width="5" height="4" rx="1" /><rect x="9.5" y="9.5" width="5" height="4" rx="1" /><path d="M4 6.5v4.5h5.5" /></svg>
+);

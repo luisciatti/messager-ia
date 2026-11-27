@@ -8,9 +8,9 @@
  * Orçamento: GROUP_BUDGET (moderador + até 3 + síntese = 5).
  */
 
-import { buildSystemPrompt, STYLE_RULES, type AgentDef } from "./agents";
-import { BudgetTracker, COMPACTION_BUDGET, GROUP_BUDGET } from "./budget";
-import { loadConversation, maybeCompact, systemWithMemory, type ChatDeps } from "./chat";
+import { buildSystemPrompt, DIAGRAM_RULE, IMAGE_ONLY_TEXT, type AgentDef } from "./agents";
+import { BudgetTracker, COMPACTION_BUDGET, GROUP_BUDGET, GROUP_IMAGE_BUDGET } from "./budget";
+import { loadConversation, maybeCompact, systemWithMemory, type ChatDeps, type SendOptions } from "./chat";
 import { appendMessages, buildContext, type Conversation, type StoredMessage } from "./conversation";
 import type { GroupDef } from "./groups";
 import { estimateRequestTokens } from "./metered";
@@ -61,21 +61,40 @@ export interface GroupResult {
   sintetizou: boolean;
 }
 
+export const DESCRIBE_SYSTEM = "Descreva a imagem em até 80 palavras: textos, números, erros e componentes visíveis. Sem opinião.";
+
 export async function sendGroup(
   deps: GroupDeps,
   groupId: string,
-  texto: string,
+  textoOriginal: string,
   onEvent?: (e: GroupEvent) => void,
+  opts: SendOptions = {},
 ): Promise<GroupResult> {
   const group = deps.groups.get(groupId);
   if (!group) throw new Error(`grupo desconhecido: ${groupId}`);
-  const budget = new BudgetTracker(GROUP_BUDGET);
+  const budget = new BudgetTracker(opts.imagem ? GROUP_IMAGE_BUDGET : GROUP_BUDGET);
   const key = groupKey(groupId);
   let conv = await loadConversation(deps.storage, key);
+  let texto = textoOriginal || (opts.imagem ? IMAGE_ONLY_TEXT : "");
 
   // 1) quem fala
   let falantes = parseMentions(texto, group.membros).slice(0, group.maxFalantes);
   const viaMencao = falantes.length > 0;
+
+  // Imagem: com 1 agente chamado por @menção, vai direto para ele.
+  // Senão, é descrita UMA vez (tier quick) e a descrição em texto segue para
+  // moderador, agentes e síntese, em vez de pagar a imagem em cada chamada.
+  const imagemDireta = opts.imagem && viaMencao && falantes.length === 1 ? opts.imagem : undefined;
+  let descricao: string | undefined;
+  if (opts.imagem && !imagemDireta) {
+    const d = await deps.metered.ask(
+      { system: DESCRIBE_SYSTEM, messages: [{ role: "user", content: texto }], modelTier: "quick", images: [opts.imagem.blob], imageTokens: opts.imagem.tokens },
+      { agentId: "visao", groupId, reason: "visao" },
+      budget,
+    );
+    descricao = d.text.trim();
+    texto = `${texto}\n[imagem anexada: ${descricao}]`;
+  }
   if (!viaMencao) {
     const mod = deps.agents.get(MODERATOR_ID)!;
     const res = await deps.metered.ask(
@@ -96,10 +115,19 @@ export async function sendGroup(
     const agent = deps.agents.get(id)!;
     // sozinho: responde direto ao usuário em linguagem normal (sem síntese)
     const base = sozinho
-      ? buildSystemPrompt({ ...agent, estilo: "normal" }, "direto")
+      ? buildSystemPrompt(agent, "direto")
       : buildSystemPrompt(agent, "grupo");
-    const { system } = await systemWithMemory(deps, base, texto);
-    reqs.push({ id, req: { system, messages: contexto, modelTier: agent.tier } });
+    const { system } = await systemWithMemory(deps, base + (sozinho && opts.diagrama ? `\n${DIAGRAM_RULE}` : ""), texto);
+    reqs.push({
+      id,
+      req: {
+        system,
+        messages: contexto,
+        modelTier: agent.tier,
+        images: imagemDireta ? [imagemDireta.blob] : undefined,
+        imageTokens: imagemDireta?.tokens,
+      },
+    });
   }
   const reservaSintese = sozinho ? 0 : 1;
   while (reqs.length > 1) {
@@ -121,7 +149,14 @@ export async function sendGroup(
   const validas = falas.filter((f) => !f.passou);
 
   const now = Date.now();
-  const novas: StoredMessage[] = [{ role: "user", content: texto, at: now }];
+  const novas: StoredMessage[] = [
+    {
+      role: "user",
+      content: textoOriginal,
+      at: now,
+      imagem: opts.imagem ? { url: opts.imagem.url, tokens: opts.imagem.tokens, descricao } : undefined,
+    },
+  ];
   let sintetizou = false;
 
   // 4) resposta final
@@ -136,7 +171,7 @@ export async function sendGroup(
     const falasTxt = validas.map((f) => `[${deps.agents.get(f.id)!.nome}]: ${f.texto}`).join("\n\n");
     const res = await deps.metered.ask(
       {
-        system: `${synth.instrucoes}\n${STYLE_RULES[synth.estilo]}`,
+        system: buildSystemPrompt(synth, "direto") + (opts.diagrama ? `\n${DIAGRAM_RULE}` : ""),
         messages: [{ role: "user", content: `Pergunta: ${texto}\n\nFalas:\n${falasTxt}` }],
         modelTier: synth.tier,
         onText: (t) => onEvent?.({ tipo: "sintese", texto: t }),

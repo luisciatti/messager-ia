@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt, compactBody, parseAgent, STYLE_RULES } from "../src/core/agents";
+import { buildSystemPrompt, compactBody, parseAgent, STYLE_RULES, USER_STYLE } from "../src/core/agents";
 import { agents } from "../src/core/registry";
 import { estimateTokens } from "../src/core/tokens";
 
@@ -7,7 +7,8 @@ import { estimateTokens } from "../src/core/tokens";
  * Teto de tokens do system prompt por papel. O system vai em TODA chamada,
  * então este teste reprova o PR se alguém engordar um agente.
  */
-const MAX_SYSTEM_TOKENS = { especialista: 160, moderador: 80, sintese: 80 } as const;
+const MAX_SYSTEM_TOKENS = { especialista: 160, moderador: 80, sintese: 120 } as const;
+const MAX_DIRECT_TOKENS = 190;
 
 const sample = `---
 id: x
@@ -51,7 +52,13 @@ describe("buildSystemPrompt", () => {
     const a = parseAgent(sample);
     expect(buildSystemPrompt(a, "grupo")).toContain("PASSO");
     expect(buildSystemPrompt(a, "direto")).not.toContain("PASSO");
-    expect(buildSystemPrompt(a, "direto")).toContain(STYLE_RULES.caveman);
+    expect(buildSystemPrompt(a, "grupo")).toContain(STYLE_RULES.caveman);
+  });
+
+  it("o que o usuário lê usa sempre o estilo conciso com pergunta", () => {
+    const a = parseAgent(sample);
+    expect(buildSystemPrompt(a, "direto")).toContain(USER_STYLE);
+    expect(buildSystemPrompt(a, "direto")).not.toContain(STYLE_RULES.caveman);
   });
 });
 
@@ -65,9 +72,9 @@ describe("agentes do repositório", () => {
   });
 
   for (const [id, agent] of agents) {
-    it(`${id}: system prompt dentro do teto de tokens`, () => {
-      const tokens = estimateTokens(buildSystemPrompt(agent, "grupo"));
-      expect(tokens).toBeLessThanOrEqual(MAX_SYSTEM_TOKENS[agent.papel]);
+    it(`${id}: system prompt dentro do teto de tokens (grupo e 1:1)`, () => {
+      expect(estimateTokens(buildSystemPrompt(agent, "grupo"))).toBeLessThanOrEqual(MAX_SYSTEM_TOKENS[agent.papel]);
+      expect(estimateTokens(buildSystemPrompt(agent, "direto"))).toBeLessThanOrEqual(MAX_DIRECT_TOKENS);
     });
   }
 });

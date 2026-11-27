@@ -24,6 +24,10 @@ export interface AskRequest {
   modelTier?: ModelTier;
   onText?: (fullText: string) => void;
   signal?: AbortSignal;
+  /** Imagens desta chamada (já reduzidas). */
+  images?: Blob[];
+  /** Tokens estimados das imagens, para medição e orçamento. */
+  imageTokens?: number;
 }
 
 export interface AskResult {
@@ -48,15 +52,23 @@ export function buildInput(req: AskRequest): ChatMessage[] {
   ];
 }
 
-type SampleFn = (
+type SampleFn = ((
   input: ChatMessage[],
   opts?: {
     modelTier?: ModelTier;
     signal?: AbortSignal;
     cache?: boolean;
+    images?: Blob[];
     onText?: (e: { text: string; delta: string }) => void;
   },
-) => Promise<AskResult>;
+) => Promise<AskResult>) & { limits?: () => Promise<{ images?: boolean }> };
+
+export class ImagesUnsupportedError extends Error {
+  constructor() {
+    super("Este ambiente não aceita imagens no Claude.");
+    this.name = "ImagesUnsupportedError";
+  }
+}
 
 interface ArtifactRuntime {
   use(name: string): Promise<unknown>;
@@ -66,10 +78,15 @@ export function createArtifactClient(sample: SampleFn): ClaudeClient {
   return {
     mode: "artifact",
     async ask(req) {
+      if (req.images?.length) {
+        const lim = await sample.limits?.();
+        if (!lim?.images) throw new ImagesUnsupportedError();
+      }
       const res = await sample(buildInput(req), {
         modelTier: req.modelTier ?? "default",
         signal: req.signal,
         cache: false,
+        images: req.images?.length ? req.images : undefined,
         onText: req.onText ? (e) => req.onText!(e.text) : undefined,
       });
       return { text: res.text, truncated: res.truncated };
@@ -92,6 +109,9 @@ export function mockReply(req: AskRequest): string {
     const falam = escolhidos.length ? escolhidos : linhas.slice(0, 2).map(([, id]) => id);
     return JSON.stringify({ falam, motivo: "simulado por palavra-chave" });
   }
+  if (req.system.includes("Descreva a imagem")) {
+    return "(simulado) Print de tela com um painel e uma mensagem de erro.";
+  }
   if (req.system.includes("Resuma a conversa")) {
     return JSON.stringify({ resumo: "(simulado) resumo da conversa.", notas: [] });
   }
@@ -100,7 +120,9 @@ export function mockReply(req: AskRequest): string {
     return `(simulado) Síntese das falas de ${nomes.join(", ")}. No artifact, o Claude une as posições de verdade.`;
   }
   const pergunta = last.split("\n\n").at(-1) ?? last;
-  return `(simulado) Resposta de teste para: "${pergunta.slice(0, 120)}". No artifact, o Claude responde de verdade.`;
+  const img = req.images?.length ? ` Recebi ${req.images.length} imagem(ns).` : "";
+  const diagrama = req.system.includes("mermaid") ? "\n\n```mermaid\ngraph LR\n  Usuario --> LB[Load Balancer]\n  LB --> A[App 1]\n  LB --> B[App 2]\n```" : "";
+  return `(simulado) Resposta de teste para: "${pergunta.slice(0, 120)}".${img} No artifact, o Claude responde de verdade.${diagrama}`;
 }
 
 export function createMockClient(delayMs = typeof window === "undefined" ? 0 : 500): ClaudeClient {

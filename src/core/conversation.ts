@@ -8,6 +8,7 @@
  */
 
 import type { AskRequest, ChatMessage } from "../adapters/claude";
+import type { ImagemSalva } from "./images";
 
 export const KEEP_LAST = 6;
 export const COMPACT_AT = 14;
@@ -24,6 +25,8 @@ export interface StoredMessage {
   tokens?: number;
   /** Resposta reaproveitada de uma fixada (0 tokens). */
   reaproveitada?: boolean;
+  /** Imagem enviada pelo usuário. No histórico vira só um marcador de texto. */
+  imagem?: ImagemSalva;
   /** Fala individual de agente no grupo: exibida, mas fora do contexto (a síntese já a cobre). */
   interna?: boolean;
 }
@@ -53,11 +56,15 @@ function normalize(list: ChatMessage[]): ChatMessage[] {
   return out;
 }
 
+export function imageMarker(img: ImagemSalva): string {
+  return img.descricao ? `[imagem anexada: ${img.descricao}]` : "[imagem anexada]";
+}
+
 export function buildContext(conv: Conversation, userText: string): ChatMessage[] {
   const recent = conv.mensagens
     .slice(conv.compactadoAte)
     .filter((m) => !m.interna)
-    .map(({ role, content }) => ({ role, content }));
+    .map(({ role, content, imagem }) => ({ role, content: imagem ? `${imageMarker(imagem)}${content ? `\n${content}` : ""}` : content }));
   const msgs = normalize([...recent, { role: "user", content: userText }]);
   if (conv.resumo) {
     msgs[0] = { ...msgs[0], content: `<resumo_anterior>\n${conv.resumo}\n</resumo_anterior>\n\n${msgs[0].content}` };
