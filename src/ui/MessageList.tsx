@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Avatar } from "./Avatar";
 import { IconPin } from "./icons";
 import { Markdown } from "./Markdown";
+import { safeImageUrl } from "../adapters/imageStore";
 
 export interface ThreadItem {
   autorId: string;
@@ -21,6 +22,8 @@ export interface Row {
   pendente?: boolean;
   onPin?: () => void;
   thread?: ThreadItem[];
+  imagemUrl?: string;
+  imagemTokens?: number;
 }
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -95,6 +98,11 @@ export function MessageList({ rows, vazio, extra }: { rows: Row[]; vazio: ReactN
                     {r.tokens !== undefined && !r.reaproveitada && <span className="meta">~{r.tokens} tok</span>}
                     {r.reaproveitada && <span className="tag">reaproveitada · 0 tok</span>}
                   </header>
+                )}
+                {r.imagemTokens !== undefined && (
+                  safeImageUrl(r.imagemUrl)
+                    ? <img className="msg-img" src={safeImageUrl(r.imagemUrl)} alt="Imagem enviada" />
+                    : <span className="tag">imagem · ~{r.imagemTokens} tok</span>
                 )}
                 {r.texto && <Markdown texto={r.texto} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ImagesUnsupportedError } from "../adapters/claude";
 import { BudgetExceededError } from "../core/budget";
 import { loadConversation } from "../core/chat";
 import type { Conversation } from "../core/conversation";
@@ -8,6 +9,7 @@ import { Avatar } from "./Avatar";
 import { Composer } from "./Composer";
 import { IconHash } from "./icons";
 import { MessageList, type Row, type ThreadItem } from "./MessageList";
+import type { Anexo } from "./prepareImage";
 import type { Services } from "./services";
 
 interface Progresso {
@@ -23,7 +25,10 @@ export function GroupView({ services, group }: { services: Services; group: Grou
   const [enviado, setEnviado] = useState<string | null>(null);
   const [prog, setProg] = useState<Progresso | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "sintetizador" ? "Síntese" : id);
+  const [anexo, setAnexo] = useState<Anexo | null>(null);
+  const [anexoEnviado, setAnexoEnviado] = useState<Anexo | null>(null);
+  const [diagrama, setDiagrama] = useState(false);
+  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "sintetizador" ? "Síntese" : id === "visao" ? "Visão" : id);
 
   useEffect(() => {
     let vivo = true;
@@ -44,20 +49,35 @@ export function GroupView({ services, group }: { services: Services; group: Grou
 
   async function enviar() {
     const t = texto.trim();
-    if (!t || prog) return;
+    if ((!t && !anexo) || prog) return;
     setErro(null);
     setEnviado(t);
     setTexto("");
+    const img = anexo;
+    setAnexoEnviado(img);
+    setAnexo(null);
     setProg({ falas: [] });
     try {
-      const r = await sendGroup(services, group.id, t, onEvent);
+      const url = img ? await services.images.save(img.blob, img.thumb) : undefined;
+      const r = await sendGroup(services, group.id, t, onEvent, {
+        imagem: img ? { blob: img.blob, tokens: img.tokens, url } : undefined,
+        diagrama,
+      });
       setConv(r.conversa);
+      setDiagrama(false);
+      if (img) URL.revokeObjectURL(img.previewUrl);
     } catch (e) {
       setTexto(t);
-      setErro(e instanceof BudgetExceededError ? e.message : "O grupo não conseguiu responder. Tente de novo.");
+      setAnexo(img);
+      setErro(
+        e instanceof BudgetExceededError || e instanceof ImagesUnsupportedError
+          ? e.message
+          : "O grupo não conseguiu responder. Tente de novo.",
+      );
     } finally {
       setProg(null);
       setEnviado(null);
+      setAnexoEnviado(null);
     }
   }
 
@@ -80,6 +100,8 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         texto: m.content,
         tokens: deUsuario ? undefined : m.tokens,
         thread: pend.length ? pend : undefined,
+        imagemUrl: m.imagem?.url,
+        imagemTokens: m.imagem?.tokens,
       });
       pend = [];
     });
@@ -96,7 +118,11 @@ export function GroupView({ services, group }: { services: Services; group: Grou
     <>
       <article className="msg pendente">
         <div className="msg-lado"><Avatar id="voce" label="Eu" /></div>
-        <div className="msg-corpo"><header><strong>Você</strong></header><p>{enviado}</p></div>
+        <div className="msg-corpo">
+          <header><strong>Você</strong></header>
+          {anexoEnviado && <img className="msg-img" src={anexoEnviado.thumb} alt="Imagem enviada" />}
+          {enviado && <p>{enviado}</p>}
+        </div>
       </article>
       <p className="status">{status}</p>
       {prog.falas.map((f) => (
@@ -154,6 +180,10 @@ export function GroupView({ services, group }: { services: Services; group: Grou
         valor={texto}
         placeholder={`Mensagem para #${group.nome.toLowerCase()}`}
         desabilitado={!!prog}
+        anexo={anexo}
+        diagrama={diagrama}
+        onAnexo={setAnexo}
+        onDiagrama={setDiagrama}
         onChange={setTexto}
         onEnviar={() => void enviar()}
       />

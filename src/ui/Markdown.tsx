@@ -14,19 +14,20 @@ function Inl({ inl }: { inl: Inline[] }) {
   );
 }
 
-// Mermaid carregado sob demanda do CDN (permitido no artifact), versão fixa.
-const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+// Mermaid empacotado no build, mas em chunk separado: só é baixado
+// quando aparece o primeiro diagrama (não pesa na abertura do app).
 type MermaidApi = {
   initialize(cfg: Record<string, unknown>): void;
   render(id: string, code: string): Promise<{ svg: string }>;
 };
 let mermaidPromise: Promise<MermaidApi> | null = null;
 function loadMermaid(): Promise<MermaidApi> {
-  mermaidPromise ??= import(/* @vite-ignore */ MERMAID_URL).then((m: { default: MermaidApi }) => {
+  mermaidPromise ??= import("mermaid").then((m) => {
     const dark = matchMedia("(prefers-color-scheme: dark)").matches;
     // htmlLabels false: rótulos em <text> SVG, que renderizam dentro de <img>.
-    m.default.initialize({ startOnLoad: false, securityLevel: "strict", htmlLabels: false, flowchart: { htmlLabels: false }, theme: dark ? "dark" : "neutral" });
-    return m.default;
+    const api = m.default as unknown as MermaidApi;
+    api.initialize({ startOnLoad: false, securityLevel: "strict", htmlLabels: false, flowchart: { htmlLabels: false }, theme: dark ? "dark" : "neutral" });
+    return api;
   });
   return mermaidPromise;
 }

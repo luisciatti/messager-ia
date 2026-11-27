@@ -3,7 +3,7 @@ import { CHARS_PER_TOKEN, type UsageEntry, type UsageTotals } from "../core/toke
 import type { Services } from "./services";
 
 type Periodo = "hoje" | "7d";
-const MOTIVOS: Record<string, string> = { resposta: "Respostas", moderacao: "Moderação", sintese: "Síntese", resumo: "Resumos" };
+const MOTIVOS: Record<string, string> = { resposta: "Respostas", moderacao: "Moderação", sintese: "Síntese", resumo: "Resumos", visao: "Imagens" };
 
 function soma(list: readonly UsageEntry[]): UsageTotals {
   const t = { calls: list.length, inTokens: 0, outTokens: 0, total: 0 };
@@ -56,7 +56,7 @@ export function TokensPanel({ services }: { services: Services }) {
     return services.log.entries().filter((e) => e.at >= inicio);
   }, [services, periodo, versao]);
 
-  const nome = (id: string) => services.agents.get(id)?.nome ?? id;
+  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "visao" ? "Visão (imagens)" : id);
   const total = soma(lista);
   const falhas = lista.filter((e) => e.failed).length;
 
