@@ -56,7 +56,8 @@ export function TokensPanel({ services }: { services: Services }) {
     return services.log.entries().filter((e) => e.at >= inicio);
   }, [services, periodo, versao]);
 
-  const nome = (id: string) => services.agents.get(id)?.nome ?? (id === "visao" ? "Visão (imagens)" : id);
+  const nome = (id: string) =>
+    services.agents.get(id)?.nome ?? ({ visao: "Visão (imagens)", memoria: "Memória (/clear)" } as Record<string, string>)[id] ?? id;
   const total = soma(lista);
   const falhas = lista.filter((e) => e.failed).length;
 

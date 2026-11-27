@@ -40,7 +40,10 @@ export function MemoryPanel({ services }: { services: Services }) {
       <h2>Memória</h2>
 
       <h3>Núcleo do ambiente</h3>
-      <p className="ajuda">Vai em toda conversa. Um fato por linha, curto (ex.: "Tasy roda na OCI").</p>
+      <p className="ajuda">
+        Vai em toda conversa: o que os agentes precisam saber sempre. Um fato por linha, curto (ex.: "Tasy roda na OCI",
+        "região principal sa-saopaulo-1").
+      </p>
       <textarea rows={5} value={nucleo} onChange={(e) => setNucleo(e.target.value)} />
       <div className="linha">
         <span className={tokens > NUCLEO_MAX_TOKENS ? "alerta" : "ajuda"}>
@@ -51,7 +54,10 @@ export function MemoryPanel({ services }: { services: Services }) {
       {msg && <p className="ajuda">{msg}</p>}
 
       <h3>Notas ({mem.notas.length})</h3>
-      <p className="ajuda">Extraídas das conversas. Só entram no prompt quando a pergunta tem a ver (busca local, 0 tokens).</p>
+      <p className="ajuda">
+        Fatos e decisões extraídos quando você usa <code>/clear</code> ou quando a conversa fica longa. Só entram no prompt
+        quando a pergunta tem a ver (busca local, 0 tokens).
+      </p>
       {mem.notas.length === 0 && <p className="ajuda">Nenhuma ainda.</p>}
       <ul className="itens">
         {[...mem.notas].reverse().map((n) => (

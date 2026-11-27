@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "./Avatar";
 import { ChatView } from "./ChatView";
 import { GroupView } from "./GroupView";
-import { IconChart, IconHash, IconMemory, IconMenu } from "./icons";
+import { IconChart, IconDoc, IconHash, IconMemory, IconMenu } from "./icons";
+import { DocsPanel } from "./DocsPanel";
 import { MemoryPanel } from "./MemoryPanel";
 import { createServices, type Services } from "./services";
 import { TokensPanel } from "./TokensPanel";
@@ -35,6 +36,7 @@ export function App() {
   let principal;
   if (selecionado === "memoria") principal = <MemoryPanel services={services} />;
   else if (selecionado === "tokens") principal = <TokensPanel services={services} />;
+  else if (selecionado === "docs") principal = <DocsPanel services={services} />;
   else if (grupoId && services.groups.has(grupoId)) principal = <GroupView key={selecionado} services={services} group={services.groups.get(grupoId)!} />;
   else principal = <ChatView key={(agente ?? contatos[0]).id} services={services} agent={agente ?? contatos[0]} />;
 
@@ -51,6 +53,9 @@ export function App() {
         <nav>
           <button className={item("memoria")} onClick={() => ir("memoria")}>
             <IconMemory /> Memória
+          </button>
+          <button className={item("docs")} onClick={() => ir("docs")}>
+            <IconDoc /> Docs
           </button>
           <button className={item("tokens")} onClick={() => ir("tokens")}>
             <IconChart /> Uso de tokens
