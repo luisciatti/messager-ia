@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { AgentDef } from "../core/agents";
 import { ImagesUnsupportedError } from "../adapters/claude";
 import { BudgetExceededError } from "../core/budget";
-import { directKey, loadConversation, sendDirect, useSaved } from "../core/chat";
+import { directKey, loadConversation, retryLast, sendDirect, useSaved } from "../core/chat";
 import { visibleFrom, type Conversation } from "../core/conversation";
 import { findFixada, type Fixada } from "../core/memory";
 import { Avatar } from "./Avatar";
@@ -95,6 +95,26 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
     }
   }
 
+  async function refazer() {
+    if (enviando || !conv) return;
+    setErro(null);
+    setAviso(null);
+    // mostra a pergunta de novo como pendente, sem a resposta antiga
+    setEnviado(conv.mensagens.at(-2)?.content ?? "");
+    setConv({ ...conv, mensagens: conv.mensagens.slice(0, -2) });
+    setParcial("");
+    try {
+      const r = await retryLast(services, agent.id, "default", setParcial);
+      setConv(r.conversa);
+    } catch {
+      setErro("Não consegui refazer agora.");
+      setConv(await loadConversation(services.storage, directKey(agent.id)));
+    } finally {
+      setParcial(null);
+      setEnviado(null);
+    }
+  }
+
   async function usarFixada(f: Fixada) {
     setConv(await useSaved(services, agent.id, texto.trim(), f));
     setTexto("");
@@ -123,6 +143,9 @@ export function ChatView({ services, agent }: { services: Services; agent: Agent
       };
       if (!deUsuario && !m.reaproveitada) {
         row.onVoto = async (v) => setConv(await votar(services.storage, directKey(agent.id), conv, i, v));
+      }
+      if (!deUsuario && m.tier === "quick" && i === conv.mensagens.length - 1 && !conv.mensagens[i - 1]?.imagem) {
+        row.onRefazer = () => void refazer();
       }
       if (!deUsuario && !m.reaproveitada) {
         row.onPin = async () => {

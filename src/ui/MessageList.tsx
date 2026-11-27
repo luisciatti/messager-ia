@@ -27,6 +27,7 @@ export interface Row {
   feedback?: 1 | -1;
   onVoto?: (v: 1 | -1) => void;
   leve?: boolean;
+  onRefazer?: () => void;
 }
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -128,6 +129,11 @@ export function MessageList({
                 )}
                 {r.texto && <Markdown texto={r.texto} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}
+                {r.onRefazer && (
+                  <button className="refazer" onClick={r.onRefazer} title="Pergunta de novo no modelo padrão (1 chamada a mais)">
+                    Refazer no modelo padrão
+                  </button>
+                )}
               </div>
               {(r.onPin || r.onVoto) && (
                 <div className="msg-acoes">
