@@ -275,3 +275,12 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--acento);
 .canal-acoes button.perigo { border-color: var(--erro); color: var(--erro); }
 .painel .md-code code { border: none; background: none; padding: 0; color: var(--texto); }
 .form-agente .md-code { white-space: pre-wrap; font-size: 13px; }
+
+/* Fontes da web */
+.fontes { margin: 6px 0 2px; padding: 6px 10px; list-style: none; border-left: 3px solid #1264a3; background: #f4f8fb; border-radius: 4px; font-size: 13px; }
+.fontes li { margin: 2px 0; color: #1d1c1d; }
+.fontes a { color: #1264a3; text-decoration: none; }
+.fontes a:hover { text-decoration: underline; }
+.fonte-n { color: #616061; font-variant-numeric: tabular-nums; }
+.refazer.destaque { background: #e8f1f8; padding: 2px 8px; border-radius: 10px; }
+.refazer + .refazer { margin-left: 12px; }

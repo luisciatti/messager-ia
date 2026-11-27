@@ -9,6 +9,8 @@ import { loadRecentUsage, persistUsage } from "../core/usageStore";
 import { inicioDoDia, loadConfig, statusMeta, type Config } from "../core/settings";
 import { loadCustomAgents, mergeCustom } from "../core/customAgents";
 import type { GroupDeps } from "../core/group";
+import type { WebSearch } from "../core/fontes";
+import { createWebSearch } from "../adapters/webSearch";
 
 export interface Services extends GroupDeps {
   client: ClaudeClient;
@@ -18,6 +20,8 @@ export interface Services extends GroupDeps {
   images: ImageStore;
   /** Mutável: atualizado ao salvar na aba de tokens. */
   config: Config;
+  /** Busca na web (Parallel Search). null: sem conector, o botão some. */
+  web: WebSearch | null;
 }
 
 export async function createServices(): Promise<Services> {
@@ -29,7 +33,15 @@ export async function createServices(): Promise<Services> {
   const custom = await loadCustomAgents(storage).catch(() => []);
   const mesclado = mergeCustom(agents, groups, custom);
   const config = await loadConfig(storage).catch(() => ({ metaDiaria: 20000, pausarNaMeta: false }));
-  return { client, storage, log, images, config, agents: mesclado.agents, groups: mesclado.groups, memory: new MemoryStore(storage), metered: createMeteredClient(client, log) };
+  const services: Services = { client, storage, log, images, config, web: null, agents: mesclado.agents, groups: mesclado.groups, memory: new MemoryStore(storage), metered: createMeteredClient(client, log) };
+  // Não bloqueia a abertura do app: o botão aparece quando o conector responder.
+  void createWebSearch()
+    .then((w) => {
+      services.web = w;
+      if (w) globalThis.dispatchEvent?.(new Event("web-pronta"));
+    })
+    .catch(() => undefined);
+  return services;
 }
 
 /** Uso de hoje contra a meta diária (0 tokens: só soma o log local). */

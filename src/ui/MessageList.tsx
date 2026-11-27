@@ -29,6 +29,10 @@ export interface Row {
   leve?: boolean;
   onRefazer?: () => void;
   onReplica?: () => void;
+  onVerificar?: () => void;
+  /** Pergunta sobre algo que muda (preço, versão, limite…): botão em destaque. */
+  verificarDestaque?: boolean;
+  fontes?: { url: string; titulo: string; data?: string }[];
 }
 
 const hora = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -68,6 +72,32 @@ function Thread({ itens }: { itens: ThreadItem[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+const httpsOk = (u: string) => {
+  try {
+    return new URL(u).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+function Fontes({ fontes }: { fontes: NonNullable<Row["fontes"]> }) {
+  return (
+    <ol className="fontes" aria-label="Fontes">
+      {fontes.map((f, i) => (
+        <li key={i}>
+          <span className="fonte-n">[{i + 1}]</span>{" "}
+          {httpsOk(f.url) ? (
+            <a href={f.url} target="_blank" rel="noopener noreferrer">{f.titulo}</a>
+          ) : (
+            <span>{f.titulo}</span>
+          )}
+          {f.data && <span className="meta"> · {f.data}</span>}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -129,7 +159,17 @@ export function MessageList({
                     : <span className="tag">imagem · ~{r.imagemTokens} tok</span>
                 )}
                 {r.texto && <Markdown texto={r.texto} />}
+                {r.fontes && r.fontes.length > 0 && <Fontes fontes={r.fontes} />}
                 {r.thread && r.thread.length > 0 && <Thread itens={r.thread} />}
+                {r.onVerificar && (
+                  <button
+                    className={`refazer ${r.verificarDestaque ? "destaque" : ""}`}
+                    onClick={r.onVerificar}
+                    title="Busca fontes reais no Parallel Search e revisa a resposta com citações (~1 mil tokens)"
+                  >
+                    🔎 Verificar na web
+                  </button>
+                )}
                 {r.onReplica && (
                   <button className="refazer" onClick={r.onReplica} title="Os agentes revisam esta resposta; só falam se discordarem (2 a 4 chamadas)">
                     Pedir réplica

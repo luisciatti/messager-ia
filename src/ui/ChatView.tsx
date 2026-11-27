@@ -14,6 +14,9 @@ import type { Anexo } from "./prepareImage";
 import { bloqueioMeta, recarregarAgentes, type Services } from "./services";
 import { removeCustomAgent } from "../core/customAgents";
 import { votar } from "../core/feedback";
+import { precisaFontes, SemFontesError, ultimaResposta, verificarNaWeb } from "../core/fontes";
+import { useWeb } from "./useWeb";
+import { WebSearchError } from "../adapters/webSearch";
 
 export function ChatView({ services, agent, onRemovido }: { services: Services; agent: AgentDef; onRemovido?: () => void }) {
   const custom = (agent as { custom?: boolean }).custom === true;
@@ -128,6 +131,25 @@ export function ChatView({ services, agent, onRemovido }: { services: Services; 
     }
   }
 
+  const webOk = useWeb(services);
+  const [verificando, setVerificando] = useState(false);
+  async function verificar() {
+    if (enviando || verificando || !services.web) return;
+    setErro(null);
+    setAviso("Buscando fontes na web…");
+    setVerificando(true);
+    try {
+      const r = await verificarNaWeb({ ...services, web: services.web }, directKey(agent.id));
+      setConv(r.conversa);
+      setAviso(`Resposta revisada com ${r.fontes.length} fonte(s).`);
+    } catch (e) {
+      setAviso(null);
+      setErro(e instanceof BudgetExceededError || e instanceof SemFontesError || e instanceof WebSearchError ? e.message : "Não consegui verificar agora.");
+    } finally {
+      setVerificando(false);
+    }
+  }
+
   async function usarFixada(f: Fixada) {
     setConv(await useSaved(services, agent.id, texto.trim(), f));
     setTexto("");
@@ -153,12 +175,18 @@ export function ChatView({ services, agent, onRemovido }: { services: Services; 
         imagemTokens: m.imagem?.tokens,
         feedback: m.feedback,
         leve: !deUsuario && m.tier === "quick",
+        fontes: m.fontes,
       };
       if (!deUsuario && !m.reaproveitada) {
         row.onVoto = async (v) => setConv(await votar(services.storage, directKey(agent.id), conv, i, v));
       }
       if (!deUsuario && m.tier === "quick" && i === conv.mensagens.length - 1 && !conv.mensagens[i - 1]?.imagem) {
         row.onRefazer = () => void refazer();
+      }
+      if (webOk && !verificando && !m.fontes && ultimaResposta(conv)?.iResposta === i) {
+        const pergunta = conv.mensagens[i - 1]?.content ?? "";
+        row.onVerificar = () => void verificar();
+        row.verificarDestaque = precisaFontes(pergunta);
       }
       if (!deUsuario && !m.reaproveitada) {
         row.onPin = async () => {
@@ -170,7 +198,7 @@ export function ChatView({ services, agent, onRemovido }: { services: Services; 
       }
       return row;
     });
-  }, [conv, agent, services, inicio]);
+  }, [conv, agent, services, inicio, webOk, verificando]);
 
   const pendentes: Row[] = enviando
     ? [
